@@ -67,6 +67,54 @@ function testAltBn128() {
     sh("./altbn128_test", {cwd: "build", nopipe: true});
 }
 
+function buildCurveAdds() {
+    sh("g++ -O3 -g" +
+        " -Igoogletest-release-1.10.0/googletest/include"+
+        " -I."+
+        " -I../c"+
+        " ../c/naf.cpp"+
+        " ../c/splitparstr.cpp"+
+        " ../c/alt_bn128.cpp"+
+        " ../c/misc.cpp"+
+        " ../benchmark/curve_adds.cpp"+
+        " fq.cpp"+
+        " fq.o"+
+        " fr.cpp"+
+        " fr.o"+
+        // " googletest-release-1.10.0/libgtest.a"+
+        " -o curve_adds" +
+        " -O3 -lgmp -pthread -std=c++11 -fopenmp" , {cwd: "build", nopipe: true}
+    );
+}
+
+function benchCurveAdds() {
+    buildCurveAdds();
+    sh("./curve_adds", {cwd: "build", nopipe: true});
+}
+
+function buildBatchOperations() {
+    sh("g++" +
+        " -Igoogletest-release-1.10.0/googletest/include"+
+        " -I."+
+        " -I../c"+
+        " ../c/batch_operations.cpp"+
+        " ../c/batch_operations_test.cpp"+
+        " ../c/misc.cpp"+
+        " fq.cpp"+
+        " fq.o"+
+        " fr.cpp"+
+        " fr.o"+
+        " googletest-release-1.10.0/libgtest.a"+
+        " -o batch_operations_test" +
+        " -fmax-errors=5 -pthread -std=c++11 -fopenmp -lgmp -g", {cwd: "build", nopipe: true}
+    );
+}
+
+function testBatchOperations() {
+    buildBatchOperations();
+    sh("./batch_operations_test -v", {cwd: "build", nopipe: true});
+}
+
 
 function benchMultiExpG1() {
     sh("g++ -O3 -g" +
@@ -117,6 +165,10 @@ cli({
     createFieldSources,
     testSplitParStr,
     testAltBn128,
+    buildBatchOperations,
+    testBatchOperations,
+    benchCurveAdds,
+    buildCurveAdds,
     benchMultiExpG1,
     benchMultiExpG2,
 });

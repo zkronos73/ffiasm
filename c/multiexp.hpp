@@ -13,6 +13,8 @@ class ParallelMultiexp {
 //        uint8_t padding[32];
     };
 
+    typedef typename Curve::Point Point;
+    typedef typename Curve::PointAffine PointAffine;
     typename Curve::PointAffine *bases;
     uint8_t* scalars;
     uint32_t scalarSize;
@@ -23,6 +25,8 @@ class ParallelMultiexp {
     uint32_t nChunks;
     Curve &g;
     PaddedPoint *accs;
+    Point *chunkResults;
+    bool cache;
 
     void initAccs();
 
@@ -34,6 +38,24 @@ class ParallelMultiexp {
 public:
     ParallelMultiexp(Curve &_g): g(_g) {}
     void multiexp(typename Curve::Point &r, typename Curve::PointAffine *_bases, uint8_t* _scalars, uint32_t _scalarSize, uint32_t _n, uint32_t _nThreads=0);
+
+    inline bool checkPos(const char *name, int line, void *data) { 
+        bool result = !cache || 
+               (data >= accs && data <= (accs + (nThreads*accsPerChunk))) ||
+               (data >= bases && data <= (bases + n)) || 
+               (data >= chunkResults && data <= (chunkResults + nChunks));
+        if (!result) printf("@:%d %s %p\n", line, name, data);
+        return result;
+    }
+    inline void gCopy(int line, Point &r, Point &a) { checkPos(__func__, line, &r); g.copy(r, a); };
+    inline void gMulByScalar(int line, Point &r, PointAffine &base, uint8_t* scalar, unsigned int scalarSize) { checkPos(__func__, line, &r);g.mulByScalar(r, base, scalar, scalarSize); };
+    inline void gAdd(int line, Point &p3, Point &p1, Point &p2) { checkPos(__func__, line,  &p3);g.add(p3, p1, p2); };
+    inline void gAdd(int line, Point &p3, Point &p1, PointAffine &p2) { checkPos(__func__, line, &p3);g.add(p3, p1, p2); };
+    inline bool gIsZero(int line, Point &p1) { return g.isZero(p1); };
+    inline bool gIsZero(int line, PointAffine &p1) { return g.isZero(p1); };
+    inline void gDbl(int line, Point &r, Point &a) { checkPos(__func__, line, &r); g.dbl(r, a); };
+    inline void gDbl(int line, Point &r, PointAffine &a) { checkPos(__func__, line, &r);g.dbl(r, a); };
+
 
 };
 

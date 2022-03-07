@@ -67,6 +67,8 @@ public:
     void add(Point &p3, Point &p1, PointAffine &p2);
     void add(Point &p3, PointAffine &p1, PointAffine &p2);
     void add(Point &p3, PointAffine &p1, Point &p2) { add(p3, p2, p1); };
+    void multiAdd(PointAffine *p3, PointAffine *p1, PointAffine *p2, u_int64_t count);
+
     void add(PointAffine &p3, Point &p1, Point &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
     void add(PointAffine &p3, Point &p1, PointAffine &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
     void add(PointAffine &p3, PointAffine &p1, PointAffine &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };

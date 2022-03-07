@@ -314,6 +314,56 @@ int Raw<%=name%>::fromRprBE(Element &element, const uint8_t *data, int bytes)
     fromMpz(element, r);
     return <%=name%>_N64 * 8;
 }
+void Raw<%=name%>::batchInverse (Element *r, Element *a, int64_t count ) 
+{
+    Element *invs = new Element[count];
+    Element *prods = new Element[count];
+
+    // Calculate products: a, ab, abc, abcd, ...
+    copy(prods[0], a[0]);
+    for (int64_t index = 1; index < count; index++)
+    {
+        mul(prods[index], prods[index-1], a[index]);
+    }
+    
+    // Calculate inverses: 1/a, 1/ab, 1/abc, 1/abcd, ...
+    inv(invs[count - 1], prods[count - 1]);
+    for (int64_t index = count - 1; index > 0; index--)
+    {
+        mul(invs[index-1], invs[index], a[index]);
+    }
+    
+    copy(r[0], invs[0]);
+    for (int64_t index = 1; index < count; index++)
+    {
+        mul(r[index], invs[index], prods[index - 1]);
+    }
+    free(invs);
+    free(prods);
+}
+
+void Raw<%=name%>::batchInverse (Element *r, const Element *a, Element *invs, Element *prods, int64_t count ) 
+{
+    // Calculate products: a, ab, abc, abcd, ...
+    copy(prods[0], a[0]);
+    for (int64_t index = 1; index < count; index++)
+    {
+        mul(prods[index], prods[index-1], a[index]);
+    }
+    
+    // Calculate inverses: 1/a, 1/ab, 1/abc, 1/abcd, ...
+    inv(invs[count - 1], prods[count - 1]);
+    for (int64_t index = count - 1; index > 0; index--)
+    {
+        mul(invs[index-1], invs[index], a[index]);
+    }
+    
+    copy(r[0], invs[0]);
+    for (int64_t index = 1; index < count; index++)
+    {
+        mul(r[index], invs[index], prods[index - 1]);
+    }
+}
 
 static bool init = <%=name%>_init();
 

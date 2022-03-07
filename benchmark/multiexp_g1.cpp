@@ -2,6 +2,8 @@
 #define COUNT_OPS
 #endif
 
+#include <unistd.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "alt_bn128.hpp"
@@ -19,13 +21,24 @@ uint64_t lehmer64() {
   return g_lehmer64_state >> 64;
 }
 
-int main(int argc, char **argv) {
+#define EXPECTED_RESULT "(7686866163780120756504704687108787598650652185649163569056142218702518519446,3906118672583014628968951493493328376867199397126296469652067564264383995501)"
 
-    int N = atoi(argv[1]);
+int main(int argc, char **argv) 
+{
+//     int N = atoi(argv[1]);
+    int N;
+    int fd = open("testdata.dat", 0666);
+    printf("%ld\n",read(fd, &N, sizeof(N)));
+    printf("N=%d\n", N);
 
     uint8_t *scalars = new uint8_t[N*32];
     G1PointAffine *bases = new G1PointAffine[N];
 
+    printf("%ld %ld\n", read(fd, scalars, sizeof(scalars[0]) * N * 32), sizeof(scalars[0]) * N * 32);
+    printf("%ld %ld\n",read(fd, bases, sizeof(bases[0]) * N), sizeof(bases[0]) * N);
+    close(fd);
+
+/*
     // random scalars
     for (int i=0; i<N*4; i++) {
         *((uint64_t *)(scalars + i*8)) = lehmer64();
@@ -37,7 +50,14 @@ int main(int argc, char **argv) {
     for (int i=2; i<N; i++) {
         G1.add(bases[i], bases[i-1], bases[i-2]);
     }
-
+*/    
+/*
+    int fd = creat("testdata.dat", 0666);
+    write(fd, &N, sizeof(N));
+    write(fd, scalars, sizeof(scalars[0]) * N * 32);
+    write(fd, bases, sizeof(bases[0]) * N);
+    close(fd);
+*/
     clock_t start, end;
     double cpu_time_used;
 
@@ -46,8 +66,10 @@ int main(int argc, char **argv) {
     printf("Starting multiexp. \n");
     G1.resetCounters();
     start = clock();
-    G1.multiMulByScalar(p1, bases, (uint8_t *)scalars, 32, N);
+    G1.multiMulByScalar(p1, bases, (uint8_t *)scalars, 32, N, 1);
     end = clock();
+    std::string strResult = G1.toString(p1); 
+    printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
 
     G1.printCounters();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;

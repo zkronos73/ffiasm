@@ -652,6 +652,78 @@ void Curve<BaseField>::printCounters() {
 }
 #endif // COUNT_OPS
 
+template <typename BaseField>
+void Curve<BaseField>::multiAdd(PointAffine *p3, PointAffine *p1, PointAffine *p2, u_int64_t count) {
+#ifdef COUNT_OPS
+    cntAddAffine++;
+#endif // COUNT_OPS
+    const auto p3AlreadyCalculated = -1;
+    int64_t *eqs = new int64_t [count];
+    typename BaseField::Element *lambdas = new typename BaseField::Element[count];
+    u_int64_t lambdaIndex = 0;
+
+    for (auto index = 0; index < count; ++index) {
+//        __builtin_prefetch(p1 + index + 8);
+//        __builtin_prefetch(p2 + index + 8);
+        auto &_p1 = p1[index];
+        auto &_p2 = p2[index];
+        auto &_eqs = eqs[index];
+        if (isZero(_p1)) {
+            copy(p3[index], _p2);
+            _eqs = p3AlreadyCalculated;
+            continue;
+        }
+        if (isZero(_p2)) {
+            copy(p3[index], _p1);
+            _eqs = p3AlreadyCalculated;
+            continue;
+        }
+        _eqs = F.eq(_p1.x, _p2.x) && F.eq(_p1.y, _p2.y);
+        if (_eqs) {
+            F.add(lambdas[lambdaIndex++], _p1.y, _p1.y);
+        }
+        else {
+            F.sub(lambdas[lambdaIndex++], _p2.x, _p1.x);
+        }
+        // F.copy(lambdas[lambdaIndex++], _eqs ? F.add(_p1.y, _p1.y) : F.sub(_p2.x,_p1.x));
+    }
+
+    auto lambdaCount = lambdaIndex;
+    F.batchInverse(lambdas, lambdas, lambdaCount);
+    lambdaIndex = 0;
+    for (auto index = 0; index < count; ++index) {
+//        __builtin_prefetch(p1 + index + 8);
+//        __builtin_prefetch(p2 + index + 8);
+//        __builtin_prefetch(eqs + index + 8);
+//        __builtin_prefetch(lambdas + lambdaIndex + 8);
+        auto &_p1 = p1[index];
+        auto &_p2 = p2[index];
+        auto &_p3 = p3[index];
+        auto &_eqs = eqs[index];
+        auto &_lambda = lambdas[lambdaIndex];
+
+        if (_eqs == p3AlreadyCalculated) continue;
+
+        if (_eqs) {            
+            // l = l * (3 * p1.x**2) + a
+            F.mul(_lambda, _lambda, F.add(F.mul(F.square(_p1.x), 3), fa));
+        }
+        else {
+            // l = l * (p2.y - p1.y)
+            F.mul(_lambda, _lambda, F.sub(_p2.y, _p1.y));
+        }
+
+        // p3.x = l**2 - (p1.x + p2.x) 
+        F.sub(_p3.x, F.square(_lambda), F.add(_p1.x, _p2.x));
+
+        // p3.y = l * (p1.x - p3.x) - p1.y
+        F.sub(_p3.y, F.mul(_lambda, F.sub(_p1.x, _p3.x)), _p1.y);
+        
+        ++lambdaIndex;
+    }
+    free(eqs);
+    free(lambdas);
+}
 
 
 

@@ -133,7 +133,9 @@ public:
     void inv(Element &r, const Element &a);
     void div(Element &r, const Element &a, const Element &b);
     void exp(Element &r, const Element &base, uint8_t* scalar, unsigned int scalarSize);
-
+    void batchInverse (Element *r, Element *a, int64_t count );
+    void batchInverse (Element *r, const Element *a, Element *invs, Element *prods, int64_t count );
+    
     void inline toMontgomery(Element &r, const Element &a) { <%=name%>_rawToMontgomery(r.v, a.v); };
     void inline fromMontgomery(Element &r, const Element &a) { <%=name%>_rawFromMontgomery(r.v, a.v); };
     int inline eq(const Element &a, const Element &b) { return <%=name%>_rawIsEq(a.v, b.v); };
