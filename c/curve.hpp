@@ -2,6 +2,8 @@
 
 #include "exp.hpp"
 #include "multiexp.hpp"
+#include "multiexp_mix.hpp"
+#include "multiexp_original.hpp"
 
 template <typename BaseField>
 class Curve {
@@ -103,6 +105,7 @@ public:
     bool isZero(PointAffine &p1);
 
     std::string toString(Point &r, uint32_t radix = 10);
+    std::string toString(PointAffine &r, uint32_t radix = 10);
 
     void copy(Point &r, Point &a);
     void copy(Point &r, PointAffine &a);
@@ -119,7 +122,17 @@ public:
 
     void multiMulByScalar(Point &r, PointAffine *bases, uint8_t* scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
         ParallelMultiexp<Curve<BaseField>> pm(*this);
-        pm.multiexp(r, bases, scalars, scalarSize, n, nThreads);
+        pm.multiexp(r, bases, scalars, scalarSize, n);
+    }
+
+    void multiMulByScalarOriginal(Point &r, PointAffine *bases, uint8_t* scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
+        ParallelMultiexpOriginal<Curve<BaseField>> pm(*this);
+        pm.multiexp(r, bases, scalars, scalarSize, n);
+    }
+
+    void multiMulByScalarMix(Point &r, PointAffine *bases, uint8_t* scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
+        ParallelMultiexpMix<Curve<BaseField>> pm(*this);
+        pm.multiexp(r, bases, scalars, scalarSize, n);
     }
 
 #ifdef COUNT_OPS

@@ -626,6 +626,13 @@ std::string Curve<BaseField>::toString(Point &p, uint32_t radix) {
     return stringStream.str();
 }
 
+template <typename BaseField>
+std::string Curve<BaseField>::toString(PointAffine &p, uint32_t radix) {
+    std::ostringstream stringStream;
+    stringStream << "(" << F.toString(p.x, radix) << "," << F.toString(p.y, radix) << ")";
+    return stringStream.str();
+}
+
 #ifdef COUNT_OPS
 template <typename BaseField>
 void Curve<BaseField>::resetCounters() {
@@ -641,14 +648,14 @@ void Curve<BaseField>::resetCounters() {
 
 template <typename BaseField>
 void Curve<BaseField>::printCounters() {
-    printf("cntAddMixed: %d\n", cntAddMixed);
-    printf("cntAdd: %d\n", cntAdd);
-    printf("cntAddAffine: %d\n", cntAddAffine);
-    printf("cntDbl: %d\n", cntDbl);
-    printf("cntDblMixed: %d\n", cntDblMixed);
-    printf("cntEq: %d\n", cntEq);
-    printf("cntEqMixed: %d\n", cntEqMixed);
-    printf("cntToAffine: %d\n", cntToAffine);
+    printf("cntAddMixed: %'d\n", cntAddMixed);
+    printf("cntAdd: %'d\n", cntAdd);
+    printf("cntAddAffine: %'d\n", cntAddAffine);
+    printf("cntDbl: %'d\n", cntDbl);
+    printf("cntDblMixed: %'d\n", cntDblMixed);
+    printf("cntEq: %'d\n", cntEq);
+    printf("cntEqMixed: %'d\n", cntEqMixed);
+    printf("cntToAffine: %'d\n", cntToAffine);
 }
 #endif // COUNT_OPS
 

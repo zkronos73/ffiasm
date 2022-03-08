@@ -3,12 +3,15 @@
 #include <stdio.h>
 #include <sstream>
 #include <string>
+#include <stack>
 
 #include "batch_operations.hpp"
 
 namespace BatchOperations {
 
-Stack::Stack ( void )
+template <typename Curve>
+Stack<Curve>::Stack (Curve &_g)
+    :g(_g)
 {
     Element op = { op_set, 0, 0, 0, false };
 
@@ -16,72 +19,124 @@ Stack::Stack ( void )
     int reference = operations.size();
     operations.push_back(op);
 
-    references.push_back(0);
-    references.push_back(0);
-    references.push_back(0);
+    g.copy(zeroValue, g.zero());
+    references.push_back({0, zeroValue});
+    defines.push_back({"ZERO", 0, 1});
+    addCounter = 0;
+    dblCounter = 0;
+    addCallCounter = 0;
+    dblCallCounter = 0;
 }
 
-Stack::~Stack ( void )
+template <typename Curve>
+Stack<Curve>::~Stack ( void )
 {
-
 }
 
-Reference Stack::alloc ( int count )
+template <typename Curve>
+Reference Stack<Curve>::define ( const std::string &label, int size )
 {
-    auto reference = references.size();
-    references.resize(references.size() + count, 0);
-    updateReferencesCount(0, count);
+    Reference reference = references.size();
+    
+    references.resize(references.size() + size, {0, zeroValue});
+    defines.push_back({label, reference, size});
+    updateReferencesCount(0, size);
     return reference;
 }
 
-void Stack::copy ( Reference destRef, Reference srcRef )
+template <typename Curve>
+std::string Stack<Curve>::getReferenceLabel ( Reference reference )
+{
+    for (int index = 0; index < defines.size(); ++index) {
+        const Define &_define = defines[index];
+        if (_define.reference <= reference && (_define.reference + _define.size) > reference) {
+            std::stringstream ss;
+            ss << _define.label;
+            if (index || _define.size > 1) {
+                ss << "[" << (reference - _define.reference) << "]";
+            }
+            return ss.str();
+        }
+    }
+    std::stringstream ss;
+    ss << "UNDEFINED @" << reference ;
+    return ss.str();
+}
+
+template <typename Curve>
+void Stack<Curve>::copy ( Reference destRef, Reference srcRef )
 {
     auto srcIndex = getReferenceIndex(srcRef);
+    // printf("COPY(%ld, %ld) SRC:%ld\n", destRef, srcRef, srcIndex);
     updateReferenceIndex(destRef, srcIndex);
 }
 
-void Stack::updateReferencesCount ( Index index, int delta )
+template <typename Curve>
+void Stack<Curve>::updateReferencesCount ( Index index, int delta )
 {
-    printf("@DEBUG operations[%ld/%ld]\n", index, operations.size());
+    // printf("@DEBUG operations[%ld/%ld]\n", index, operations.size());
 
     operations[index].referenceCount += delta;
 }
 
-int Stack::getReferencesCount ( Index index )
+template <typename Curve>
+int Stack<Curve>::getReferencesCount ( Index index )
 {
     return operations[index].referenceCount;
 }
 
-void Stack::add ( Reference destRef, Reference ref1, Reference ref2 )
+template <typename Curve>
+void Stack<Curve>::add ( Reference destRef, Reference ref1, Reference ref2 )
 {
-    auto index1 = getReferenceIndex(ref1); 
+    auto index1 = getReferenceIndex(ref1);
     auto index2 = getReferenceIndex(ref2); 
+    if (!index1) {
+        updateReferenceIndex(destRef, index2);
+        return;
+    }
+    if (!index2) {
+        updateReferenceIndex(destRef, index1);
+        return;
+    }
+    ++addCounter;
+    printf("@ADD(%s:%ld, %s:%ld) => %s\n", getReferenceLabel(ref1).c_str(), index1, getReferenceLabel(ref2).c_str(), index2, getReferenceLabel(destRef).c_str());
     push(destRef, op_add, index1, index2);
 }
 
-void Stack::isZero ( Reference ref )
+template <typename Curve>
+void Stack<Curve>::isZero ( Reference ref )
 {
 
 }
 
-void Stack::setZero ( Reference ref )
+template <typename Curve>
+void Stack<Curve>::setZero ( Reference ref )
 {
 
 }
 
-void Stack::gMulByScalar ( Reference destRef, Reference baseRef, uint8_t* scalar, unsigned int scalarSize )
+template <typename Curve>
+void Stack<Curve>::gMulByScalar ( Reference destRef, Reference baseRef, uint8_t* scalar, unsigned int scalarSize )
 {
     // TODO: optimization 1, 0
 }
 
-void Stack::dbl ( Reference destRef, Reference srcRef )
+template <typename Curve>
+void Stack<Curve>::dbl ( Reference destRef, Reference srcRef )
 {
     // TODO: optimization 1, 0
+    ++dblCounter;
     auto opRef1 = getReferenceIndex(srcRef); 
+    printf("@DBL(%s:%ld) => %s\n", getReferenceLabel(srcRef).c_str(), opRef1, getReferenceLabel(destRef).c_str());
+    if (!opRef1) {
+        updateReferenceIndex(destRef, opRef1);
+        return;
+    }
     push(destRef, op_dbl, opRef1);
 }
 
-Reference Stack::push ( Reference destRef, OperationType operation, Index opRef1, Index opRef2 )
+template <typename Curve>
+Reference Stack<Curve>::push ( Reference destRef, OperationType operation, Index opRef1, Index opRef2 )
 {
     Element op = { operation, opRef1, opRef2, 0, false};
 
@@ -92,58 +147,155 @@ Reference Stack::push ( Reference destRef, OperationType operation, Index opRef1
     return reference;
 }
 
-Index Stack::getReferenceIndex ( Reference reference )
+template <typename Curve>
+Index Stack<Curve>::getReferenceIndex ( Reference reference )
 {
-    return references[reference];
+    return references[reference].index;
 }
 
-void Stack::updateReferenceIndex ( Reference reference, Index index )
+
+template <typename Curve>
+const typename Curve::PointAffine &Stack<Curve>::getReferenceValue ( Reference reference )
+{
+    return references[reference].value;
+}
+
+template <typename Curve>
+void Stack<Curve>::updateReferenceIndex ( Reference reference, Index index )
 {
     auto dstIndex = getReferenceIndex(reference);
     updateReferencesCount(index, 1);
-    printf("@DEBUG references[%ld/%ld] = %ld\n", reference, references.size(), index);
-    references[reference] = index;
+    // printf("@DEBUG references[%ld/%ld] = %ld\n", reference, references.size(), index);
+    references[reference].index = index;
     updateReferencesCount(dstIndex, -1);
 }
 
-int64_t Stack::resolve ( Reference reference, int maxDeepLevel )
+template <typename Curve>
+typename Curve::PointAffine Stack<Curve>::resolve ( Reference reference, int maxDeepLevel )
 {
     auto index = getReferenceIndex(reference);
-    return calculate(index, maxDeepLevel );
+    typename Curve::PointAffine result = iterativeCalculate(index);
+    return result;
 }
 
-std::string Stack::getPathToResolve ( Reference reference , int maxDeepLevel )
+template <typename Curve>
+std::string Stack<Curve>::getPathToResolve ( Reference reference , int maxDeepLevel )
 {
     auto index = getReferenceIndex(reference);
     return getPathToResolveIndex(index, maxDeepLevel);
 }
 
-int64_t Stack::calculate (Index index, int maxDeepLevel )
+template <typename Curve>
+typename Curve::PointAffine Stack<Curve>::iterativeCalculate (Index index, int level )
 {
-    Element e = operations[index];
-    if (maxDeepLevel > 0) {
+    std::stack<Index> st;
+
+    st.push(index);
+    while (!st.empty()) {
+        Element &e = operations[st.top()];
+        if (e.evaluated) {
+            st.pop();
+            continue;
+        }
+
+        std::string indent((st.size() - 1) * 2, ' ');
         switch (e.operation) {
             case op_set:
-                return e.oper1;
+                e.evaluated = true;
+                e.value = getReferenceValue(e.oper1);
+                printf("@C %sset(%ld)\n", indent.c_str(), e.oper1);
+                st.pop();
+                continue;
+                
             case op_add:
-                return calculate(e.oper1, maxDeepLevel-1) + calculate(e.oper2, maxDeepLevel-1);
+                {   
+                    if (!operations[e.oper1].evaluated) {
+                        st.push(e.oper1);
+                        continue;
+                    }
+                    if (!operations[e.oper2].evaluated) {
+                        st.push(e.oper2);
+                        continue;
+                    }
+                    ++addCallCounter;
+                    g.add(e.value, operations[e.oper1].value, operations[e.oper2].value);
+                    printf("@C %sadd(%ld, %ld) => %s\n", indent.c_str(), e.oper1, e.oper2, g.toString(e.value).c_str());
+                    e.evaluated = true;
+                    st.pop();
+                    continue;
+                }
             case op_dbl:
-                return 2 * calculate(e.oper1, maxDeepLevel-1);
+                {
+                    if (!operations[e.oper1].evaluated) {
+                        st.push(e.oper1);
+                        continue;
+                    }
+                    ++dblCallCounter;
+                    g.dbl(e.value, operations[e.oper1].value);
+                    printf("@C %sdbl(%ld) => %s\n", indent.c_str(), e.oper1, g.toString(e.value).c_str());
+                    e.evaluated = true;
+                    st.pop();
+                }
         }
     }
-    return -1;
+    return operations[index].evaluated ? operations[index].value : zeroValue;
 }
 
-void Stack::set ( Reference ref, int64_t value )
+template <typename Curve>
+typename Curve::PointAffine Stack<Curve>::recursiveCalculate (Index index, int level )
 {
-    push(ref, op_set, value);
+    Element &e = operations[index];
+    typename Curve::PointAffine ec;
+    std::string indent(level*2, ' ');
+
+    if (e.evaluated) {
+        return e.value;
+    }
+    switch (e.operation) {
+        case op_set:                            
+            ec = getReferenceValue(e.oper1);
+            // printf("@C %sget(%s:%ld) = %s\n", indent.c_str(), getReferenceLabel(e.oper1).c_str(), e.oper1, g.toString(ec).c_str());
+            return ec;
+        case op_add:
+            {   
+                ++addCallCounter;
+                printf("@C %sadd(%ld, %ld)\n", indent.c_str(), e.oper1, e.oper2);
+                typename Curve::PointAffine oper1 = calculate(e.oper1, level+1);
+                typename Curve::PointAffine oper2 = calculate(e.oper2, level+1);
+                g.add(e.value, oper1 ,oper2);
+                e.evaluated = true;
+                // printf("\n## %s\n +%s\n = %s\n", g.toString(oper1).c_str(), g.toString(oper2).c_str(), g.toString(ec).c_str());
+                return e.value;
+            }
+        case op_dbl:
+            {
+                ++dblCallCounter;
+                printf("@C %sdbl(%ld)\n", indent.c_str(), e.oper1);
+                typename Curve::PointAffine oper1 = calculate(e.oper1, level+1);
+                g.dbl(e.value, oper1);
+                e.evaluated = true;
+                // printf("\n## 2 * %s\n# = %s\n", g.toString(oper1).c_str(), g.toString(ec).c_str());
+                return e.value;
+            }
+    }
+    printf("ABORTING !!!!!!!\n");
+    return zeroValue;
 }
 
-void Stack::dump ( void )
+template <typename Curve>
+void Stack<Curve>::set ( Reference ref, typename Curve::PointAffine value )
+{
+    references[ref].value = value;
+    push(ref, op_set, ref);
+}
+
+template <typename Curve>
+void Stack<Curve>::dump ( void )
 {
     printf("**** REFERENCES *****\n");
     for(auto index = 0; index < references.size(); ++ index) {
-        printf("[%8d] %ld\n", index, references[index]);
+        printf("[%8d] %ld\n", index, references[index].index);
+        // , g.toString(references[index].value).c_str();
     }
     printf("\n**** OPERATIONS *****\n");
     for(auto index = 0; index < operations.size(); ++ index) {
@@ -154,7 +306,8 @@ void Stack::dump ( void )
     }
 }
 
-std::string Stack::getOperationLabel ( OperationType tp )
+template <typename Curve>
+std::string Stack<Curve>::getOperationLabel ( OperationType tp )
 {
     switch (tp) {
         case op_dbl: return "op_dbl";
@@ -166,7 +319,8 @@ std::string Stack::getOperationLabel ( OperationType tp )
     return ss.str();
 }
 
-std::string Stack::getPathToResolveIndex ( Index index, int maxDeepLevel )
+template <typename Curve>
+std::string Stack<Curve>::getPathToResolveIndex ( Index index, int maxDeepLevel )
 {
     Element e = operations[index];
     if (maxDeepLevel > 0) {
@@ -184,13 +338,15 @@ std::string Stack::getPathToResolveIndex ( Index index, int maxDeepLevel )
     return "[UPPS!!]";    
 }
 
-void Stack::normalizeOperationsLists ( OperationsLists &lists )
+template <typename Curve>
+void Stack<Curve>::normalizeOperationsLists ( OperationsLists &lists )
 {
 //    auto offsetEvaluationId = lists.size();
 //    lists.resize(offsetEvaluationId + evaluationId);
 }
 
-void Stack::getOperationsLists ( OperationsLists &lists, Index index, int maxDeepLevel )
+template <typename Curve>
+void Stack<Curve>::getOperationsLists ( OperationsLists &lists, Index index, int maxDeepLevel )
 {
     auto listIndex = lists.lists.size() - 1;
 
@@ -241,7 +397,8 @@ void Stack::getOperationsLists ( OperationsLists &lists, Index index, int maxDee
     }
 }
 
-void Stack::dumpOperationsLists ( OperationsLists &lists )
+template <typename Curve>
+void Stack<Curve>::dumpOperationsLists ( OperationsLists &lists )
 {
     std::stringstream ss;
     auto listCount = lists.lists.size();
@@ -281,13 +438,15 @@ void Stack::dumpOperationsLists ( OperationsLists &lists )
     printf("%s\n", ss.str().c_str());
 }
 
-void Stack::mark ( Reference reference )
+template <typename Curve>
+void Stack<Curve>::mark ( Reference reference )
 {
     auto index = getReferenceIndex(reference);
     operations[index].evaluate = true;
 }
 
-void Stack::clearMarks ( void )
+template <typename Curve>
+void Stack<Curve>::clearMarks ( void )
 {
     auto size = operations.size();
     for (auto index = 0; index < size; ++index) {
@@ -296,7 +455,8 @@ void Stack::clearMarks ( void )
     }
 }
 
-void Stack::clearEvaluated ( void )
+template <typename Curve>
+void Stack<Curve>::clearEvaluated ( void )
 {
     auto size = operations.size();
     for (auto index = 0; index < size; ++index) {
