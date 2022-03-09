@@ -29,8 +29,38 @@ uint64_t lehmer64() {
 #define EXPECTED_RESULT_2_32 "(11214335563238929817636333449692455681168983913051128543176696602685434833110,19682196534069234051611777524958224662412865849089027703776500470935035076258)"
 #define EXPECTED_RESULT_2_1 "(18094853483684401030214035454673779939429883778299930824975271485319162037351,13688288498368359111250679033419188395420009978839941644881073507868645204619)"
 #define EXPECTED_RESULT_2_2 "(17717503517063967127010656591622579159521290730611161775508432740108962728275,8347292658269310068911278187690526007547188570782947621250465360037527320812)"
-#define EXPECTED_RESULT EXPECTED_RESULT_2_2
+#define EXPECTED_RESULT EXPECTED_RESULT_100000_32
+/*
+void generateBigDataFile ( uint64_t n )
+{
+    int64_t maxBlock = 100000;
+    uint8_t *scalars = new uint8_t[maxBlock * 32];
 
+    int64_t count = n;
+    while (count > 0) {
+        int
+        for (int i=0; i<N*4; i++) {
+            *((uint64_t *)(scalars + i*8)) = lehmer64();
+        }
+
+
+    printf("%ld %ld\n", read(fd, scalars, sizeof(scalars[0]) * N * 32), sizeof(scalars[0]) * N * 32);
+    printf("%ld %ld\n",read(fd, bases, sizeof(bases[0]) * N), sizeof(bases[0]) * N);
+    close(fd);
+    int nscalars = 32;
+    G1PointAffine *bases = new G1PointAffine[];
+
+    N = 500000; // 0000;
+    printf("N=%d\n", N);
+
+    // random scalars
+    for (int i=0; i<N*4; i++) {
+        *((uint64_t *)(scalars + i*8)) = lehmer64();
+    }
+
+
+}
+*/
 int main(int argc, char **argv) 
 {
 //     int N = atoi(argv[1]);
@@ -39,7 +69,7 @@ int main(int argc, char **argv)
     int N;
     int fd = open("testdata.dat", 0666);
     printf("%ld\n",read(fd, &N, sizeof(N)));
-
+    printf("file contents %d bases\n", N);
 
     uint8_t *scalars = new uint8_t[N*32];
     G1PointAffine *bases = new G1PointAffine[N];
@@ -47,9 +77,9 @@ int main(int argc, char **argv)
     printf("%ld %ld\n", read(fd, scalars, sizeof(scalars[0]) * N * 32), sizeof(scalars[0]) * N * 32);
     printf("%ld %ld\n",read(fd, bases, sizeof(bases[0]) * N), sizeof(bases[0]) * N);
     close(fd);
-    int nscalars = 2;
+    int nscalars = 32;
 
-    N = 2; // 0000;
+    N = 100; // 0000;
     printf("N=%d\n", N);
 /*
     // random scalars
@@ -100,6 +130,8 @@ int main(int argc, char **argv)
     end = clock();
     strResult = G1.toString(p2); 
     printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
+    int64_t total = G1.cntAddMixed + G1.cntAdd + G1.cntAddAffine;
+    printf("P1 cntAddTotal:%'ld\n", total);
 
     G1.printCounters();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
@@ -116,11 +148,14 @@ int main(int argc, char **argv)
     end = clock();
     strResult = G1.toString(p3); 
     printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
+    int64_t total2 = G1.cntAddMixed + G1.cntAdd + G1.cntAddAffine;
+    printf("P1 cntAddTotal:%'ld\n", total2);
 
     G1.printCounters();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
     printf("Time used: %.2lf\n", cpu_time_used);
     printf("Avg time per exp: %.2lf us\n", (cpu_time_used*1000000)/N);
     printf("Exps per second: %.2lf\n", (N / cpu_time_used));
-
+    
+    printf("P1 Better %.02f%%\n", ((double)(total-total2)*100.0)/total);
 }

@@ -86,7 +86,21 @@ int Stack<Curve>::getReferencesCount ( Index index )
 }
 
 template <typename Curve>
-void Stack<Curve>::add ( Reference destRef, Reference ref1, Reference ref2 )
+void Stack<Curve>::updateOperationReferencesCount ( Index index, int delta )
+{
+    // printf("@DEBUG operations[%ld/%ld]\n", index, operations.size());
+
+    operations[index].operationReferenceCount += delta;
+}
+
+template <typename Curve>
+int Stack<Curve>::getOperationReferencesCount ( Index index )
+{
+    return operations[index].operationReferenceCount;
+}
+
+template <typename Curve>
+void Stack<Curve>::add ( Reference destRef, Reference ref1, Reference ref2, const std::string &source, int line )
 {
     auto index1 = getReferenceIndex(ref1);
     auto index2 = getReferenceIndex(ref2); 
@@ -99,8 +113,10 @@ void Stack<Curve>::add ( Reference destRef, Reference ref1, Reference ref2 )
         return;
     }
     ++addCounter;
-    printf("@ADD(%s:%ld, %s:%ld) => %s\n", getReferenceLabel(ref1).c_str(), index1, getReferenceLabel(ref2).c_str(), index2, getReferenceLabel(destRef).c_str());
-    push(destRef, op_add, index1, index2);
+    std::stringstream ss;
+    ss << "add(" << getReferenceLabel(ref1) << ":" << index1 << "," << getReferenceLabel(ref2) << ":" << index2 << ") => " << getReferenceLabel(destRef) << 
+        " at " << source << ":" << line;
+    push(destRef, op_add, index1, index2, ss.str());
 }
 
 template <typename Curve>
@@ -122,28 +138,34 @@ void Stack<Curve>::gMulByScalar ( Reference destRef, Reference baseRef, uint8_t*
 }
 
 template <typename Curve>
-void Stack<Curve>::dbl ( Reference destRef, Reference srcRef )
+void Stack<Curve>::dbl ( Reference destRef, Reference srcRef, const std::string &source, int line )
 {
     // TODO: optimization 1, 0
     ++dblCounter;
     auto opRef1 = getReferenceIndex(srcRef); 
-    printf("@DBL(%s:%ld) => %s\n", getReferenceLabel(srcRef).c_str(), opRef1, getReferenceLabel(destRef).c_str());
+    // printf("@DBL(%s:%ld) => %s\n", getReferenceLabel(srcRef).c_str(), opRef1, getReferenceLabel(destRef).c_str());
     if (!opRef1) {
         updateReferenceIndex(destRef, opRef1);
         return;
     }
-    push(destRef, op_dbl, opRef1);
+    std::stringstream ss;
+    ss << "dbl(" << getReferenceLabel(srcRef) << ":" << opRef1 << ") => " << getReferenceLabel(destRef) << " at " << source << ":" << line;
+    push(destRef, op_dbl, opRef1, opRef1, ss.str());
 }
 
 template <typename Curve>
-Reference Stack<Curve>::push ( Reference destRef, OperationType operation, Index opRef1, Index opRef2 )
+Reference Stack<Curve>::push ( Reference destRef, OperationType operation, Index opRef1, Index opRef2, const std::string &extraInfo )
 {
-    Element op = { operation, opRef1, opRef2, 0, false};
+    Element op = { operation, opRef1, opRef2, 0, 0, false, extraInfo: extraInfo};
 
     // TODO: multithread protection
     int reference = operations.size();
     operations.push_back(op);
     updateReferenceIndex(destRef, reference);
+    updateOperationReferencesCount(opRef1, 1);
+    if (opRef1 != opRef2) {
+        updateOperationReferencesCount(opRef2, 1);
+    }
     return reference;
 }
 
@@ -163,11 +185,11 @@ const typename Curve::PointAffine &Stack<Curve>::getReferenceValue ( Reference r
 template <typename Curve>
 void Stack<Curve>::updateReferenceIndex ( Reference reference, Index index )
 {
-    auto dstIndex = getReferenceIndex(reference);
+    auto oldIndex = getReferenceIndex(reference);
     updateReferencesCount(index, 1);
     // printf("@DEBUG references[%ld/%ld] = %ld\n", reference, references.size(), index);
     references[reference].index = index;
-    updateReferencesCount(dstIndex, -1);
+    updateReferencesCount(oldIndex, -1);
 }
 
 template <typename Curve>
@@ -175,6 +197,10 @@ typename Curve::PointAffine Stack<Curve>::resolve ( Reference reference, int max
 {
     auto index = getReferenceIndex(reference);
     typename Curve::PointAffine result = iterativeCalculate(index);
+    std::vector<Value> values;
+    getAdditionValues(values, index);
+    // recursiveGetAdditionValues(values, index);
+    printf("COUNT=%'ld\n", values.size());
     return result;
 }
 
@@ -186,58 +212,211 @@ std::string Stack<Curve>::getPathToResolve ( Reference reference , int maxDeepLe
 }
 
 template <typename Curve>
-typename Curve::PointAffine Stack<Curve>::iterativeCalculate (Index index, int level )
+std::string Stack<Curve>::getOperationInfo ( Index index )
+{
+    std::stringstream ss;
+    Element &e = operations[index];
+    ss << "@" << index << " " << getOperationLabel(e.operation) << "(" << e.oper1 << "," << e.oper2 << ")" << " " << e.extraInfo;
+    return ss.str();
+}
+
+template <typename Curve>
+void Stack<Curve>::recursiveGetAdditionValues (std::vector<Value> &values, Index index )
+{
+    Element &e = operations[index];
+
+    switch (e.operation) {
+        case op_set:                            
+            values.push_back(getReferenceValue(e.oper1));
+            // printf("@C %sget(%s:%ld) = %s\n", indent.c_str(), getReferenceLabel(e.oper1).c_str(), e.oper1, g.toString(ec).c_str());
+            return;
+        case op_add:
+            {   
+                ++addCallCounter;
+                // printf("@C %sadd(%ld, %ld)\n", indent.c_str(), e.oper1, e.oper2);
+                recursiveGetAdditionValues(values, e.oper1);
+                recursiveGetAdditionValues(values, e.oper2);
+                // printf("\n## %s\n +%s\n = %s\n", g.toString(oper1).c_str(), g.toString(oper2).c_str(), g.toString(ec).c_str());
+                return;
+            }
+        case op_dbl:
+            {
+                ++dblCallCounter;
+                recursiveGetAdditionValues(values, e.oper1);
+                recursiveGetAdditionValues(values, e.oper1);
+                return;
+            }
+    }
+    printf("ABORTING !!!!!!!\n");
+    return;
+}
+
+
+template <typename Curve>
+void Stack<Curve>::getAdditionValues ( std::vector<Value> &values, Index index )
 {
     std::stack<Index> st;
 
     st.push(index);
+    int64_t counter = 0;
     while (!st.empty()) {
-        Element &e = operations[st.top()];
+        Index operationIndex = st.top();
+        st.pop();
+        ++counter;
+        printf("ST[%10ld] index: %10ld   C:%10ld\n", st.size(), operationIndex, counter);
+        Element &e = operations[operationIndex];
+        if (e.evaluated > 5000 && e.operation != op_set) {
+            printf("DEAD LOCK on %ld\n", operationIndex);
+            for (int i = 0; i < operations.size(); ++i) {
+                if (operations[i].evaluated > 2000 && operations[i].operation != op_set) {
+                    printf("# dead-lock on %d [%s] ? %d\n", i, getOperationLabel(operations[i].operation).c_str(), operations[i].evaluated);
+                }
+            }
+            while (!st.empty()) {
+                printf("#ST[%4ld] index: %10ld content:%s\n", st.size(), st.top(), getOperationInfo(st.top()).c_str());
+                st.pop();
+            }
+
+            exit(EXIT_FAILURE);
+        }
+
+        // std::string indent(level * 2, ' ');
+        switch (e.operation) {
+            case op_set:
+                ++e.evaluated;
+                e.value = getReferenceValue(e.oper1);
+                values.push_back(e.value);
+                printf("@C set(%ld) %s\n", e.oper1, getReferenceLabel(e.oper1).c_str());
+                continue;
+                
+            case op_add:
+                {   
+                    printf("PUSH %ld\n", e.oper1);
+                    printf("PUSH %ld\n", e.oper2);
+                    st.push(e.oper1);
+                    st.push(e.oper2);
+                    continue;
+                    ++addCallCounter;
+                    // g.add(e.value, operations[e.oper1].value, operations[e.oper2].value);
+                    printf("@C add(%ld, %ld)\n", e.oper1, e.oper2);// g.toString(e.value).c_str());
+                    ++e.evaluated;
+                    continue;
+                }
+            case op_dbl:
+                {
+                    printf("PUSH %ld\n", e.oper1);
+                    printf("PUSH %ld\n", e.oper1);
+                    st.push(e.oper1);
+                    st.push(e.oper1);
+                    ++dblCallCounter;
+                    // g.dbl(e.value, operations[e.oper1].value);
+                    // printf("@C %sdbl(%ld)\n", indent.c_str(), e.oper1); // g.toString(e.value).c_str());
+                    ++e.evaluated;
+                    continue;
+                }
+        }
+        printf("UUPS %d\n", e.operation);
+        exit(EXIT_FAILURE);
+    }
+}
+
+template <typename Curve>
+typename Curve::PointAffine Stack<Curve>::iterativeCalculate ( Index index )
+{
+    struct CalculateStackElement {
+        Index index;
+        int64_t level;
+    };
+    std::stack<CalculateStackElement> st;
+    int64_t level = 0;
+    int64_t maxLevel = 0;
+
+    std::vector<std::vector<Index>> lists;
+
+    std::vector<Value> values;
+    st.push({index, level});
+    while (!st.empty()) {
+        auto cse = st.top();
+        Element &e = operations[cse.index];
+        level = cse.level;
+        if (level > maxLevel) {
+            maxLevel = level;
+        }
+        if (lists.size() < level) {
+            lists.resize(level+1);
+        }
+
         if (e.evaluated) {
-            st.pop();
+            st.pop();            
             continue;
         }
 
-        std::string indent((st.size() - 1) * 2, ' ');
+        std::string indent(level * 2, ' ');
         switch (e.operation) {
             case op_set:
                 e.evaluated = true;
                 e.value = getReferenceValue(e.oper1);
-                printf("@C %sset(%ld)\n", indent.c_str(), e.oper1);
+                values.push_back(e.value);
+                // printf("@C %sset(%ld)\n", indent.c_str(), e.oper1);
                 st.pop();
                 continue;
                 
             case op_add:
                 {   
                     if (!operations[e.oper1].evaluated) {
-                        st.push(e.oper1);
+                        st.push({e.oper1, level + (operations[e.oper1].operationReferenceCount > 1 ? 1 : 0)});
                         continue;
                     }
                     if (!operations[e.oper2].evaluated) {
-                        st.push(e.oper2);
+                        st.push({e.oper2, level + (operations[e.oper2].operationReferenceCount > 1 ? 1 : 0)});
                         continue;
                     }
                     ++addCallCounter;
-                    g.add(e.value, operations[e.oper1].value, operations[e.oper2].value);
-                    printf("@C %sadd(%ld, %ld) => %s\n", indent.c_str(), e.oper1, e.oper2, g.toString(e.value).c_str());
+                    lists[level].push_back(cse.index);
+                    // g.add(e.value, operations[e.oper1].value, operations[e.oper2].value);
+
+                    printf("@C %sadd(%ld, %ld)\n", indent.c_str(), e.oper1, e.oper2);// g.toString(e.value).c_str());
                     e.evaluated = true;
-                    st.pop();
                     continue;
                 }
             case op_dbl:
                 {
                     if (!operations[e.oper1].evaluated) {
-                        st.push(e.oper1);
+                        st.push({e.oper1, level + (operations[e.oper1].operationReferenceCount > 1 ? 1 : 0)});
                         continue;
                     }
                     ++dblCallCounter;
+                    lists[level].push_back(cse.index);
                     g.dbl(e.value, operations[e.oper1].value);
-                    printf("@C %sdbl(%ld) => %s\n", indent.c_str(), e.oper1, g.toString(e.value).c_str());
+                    printf("@C %sdbl(%ld)\n", indent.c_str(), e.oper1); // g.toString(e.value).c_str());
                     e.evaluated = true;
-                    st.pop();
+                    continue;
                 }
         }
     }
+    int ilevel = maxLevel;
+    for (level = 0; level < lists.size(); ++level) {
+        printf("@L %ld %'ld\n", level, lists[level].size());
+    }
+
+    std::vector<std::vector<Index>>::reverse_iterator it = lists.rbegin();
+    while (it != lists.rend()) {
+        std::vector<Index>::iterator it2 = (*it).begin();
+        while (it2 != (*it).end())  {
+            printf(" %'ld ", *it2);
+            Element &e = operations[*it2];
+            ++it2;
+        }
+        printf("\n");
+        ++it;        
+    }
+/*
+    for (int64_t i = 0; i < operations.size(); ++i) {
+        if (operations[i].operationReferenceCount > 1 && operations[i].operation == op_add) 
+            printf("OPERATION %'ld %d\n", i, operations[i].operationReferenceCount);
+    }
+*/
+    printf("MAX LEVEL: %'ld\n", maxLevel);
     return operations[index].evaluated ? operations[index].value : zeroValue;
 }
 
@@ -286,7 +465,7 @@ template <typename Curve>
 void Stack<Curve>::set ( Reference ref, typename Curve::PointAffine value )
 {
     references[ref].value = value;
-    push(ref, op_set, ref);
+    push(ref, op_set, ref, ref);
 }
 
 template <typename Curve>

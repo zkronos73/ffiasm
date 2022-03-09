@@ -56,7 +56,7 @@ void ParallelMultiexp<Curve>::processChunk(uint32_t idChunk) {
         uint32_t chunkValue = getChunk(i, idChunk);
         if (chunkValue) {
             // G_ADD(accs[idThread*accsPerChunk+chunkValue].p, accs[idThread*accsPerChunk+chunkValue].p, bases[i]);
-            operations.add(accsReference + chunkValue, accsReference + chunkValue, basesReference+i);
+            operations.add(accsReference + chunkValue, accsReference + chunkValue, basesReference+i, __FILE__, __LINE__);
         }
     }
 }
@@ -70,7 +70,7 @@ void ParallelMultiexp<Curve>::reduce(int64_t chunkIndex, uint32_t nBits)
     
     while (true) {
         if (nBits == 1) {
-            operations.add(chunkResultsReference + chunkIndex, chunkResultsReference + chunkIndex, accsReference + 1);
+            operations.add(chunkResultsReference + chunkIndex, chunkResultsReference + chunkIndex, accsReference + 1, __FILE__, __LINE__);
             operations.copy(accsReference + 1, 0 );
             return;
         }
@@ -79,15 +79,15 @@ void ParallelMultiexp<Curve>::reduce(int64_t chunkIndex, uint32_t nBits)
         for (uint32_t i = 1; i<ndiv2; i++) {
 //            if (!G_IS_ZERO(accs[ndiv2 + i].p)) {
 //            maybe, check if zero reference    
-            operations.add(accsReference + i, accsReference + i, accsReference + ndiv2 + i);
-            operations.add(accsReference + ndiv2, accsReference + ndiv2, accsReference + ndiv2 + i);
+            operations.add(accsReference + i, accsReference + i, accsReference + ndiv2 + i, __FILE__, __LINE__);
+            operations.add(accsReference + ndiv2, accsReference + ndiv2, accsReference + ndiv2 + i, __FILE__, __LINE__);
             operations.copy(accsReference + ndiv2 + i, 0 );
 //            }
         }
         for (u_int32_t i=0; i<(nBits - 1); i++) {
-            operations.dbl(accsReference + ndiv2, accsReference + ndiv2);
+            operations.dbl(accsReference + ndiv2, accsReference + ndiv2, __FILE__, __LINE__);
         }        
-        operations.add(chunkResultsReference + chunkIndex, chunkResultsReference + chunkIndex, accsReference + ndiv2);
+        operations.add(chunkResultsReference + chunkIndex, chunkResultsReference + chunkIndex, accsReference + ndiv2, __FILE__, __LINE__);
         operations.copy(accsReference + ndiv2, 0 );
         --nBits;
     }
@@ -152,8 +152,8 @@ void ParallelMultiexp<Curve>::multiexp(typename Curve::Point &r, typename Curve:
     BatchOperations::Reference resultReference = operations.define("result", 1);
     operations.copy(resultReference, chunkResultsReference + nChunks - 1);
     for  (int j=nChunks-2; j>=0; j--) {
-        for (uint32_t k=0; k<bitsPerChunk; k++) operations.dbl(resultReference, resultReference);
-        operations.add(resultReference, resultReference, chunkResultsReference + j);
+        for (uint32_t k=0; k<bitsPerChunk; k++) operations.dbl(resultReference, resultReference, __FILE__, __LINE__);
+        operations.add(resultReference, resultReference, chunkResultsReference + j, __FILE__, __LINE__);
     }
 
     delete[] chunkResults; 

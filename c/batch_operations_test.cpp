@@ -2,26 +2,28 @@
 #include <iostream>
 
 #include "gtest/gtest.h"
+#include "alt_bn128.hpp"
 #include "batch_operations.hpp"
 
 using namespace BatchOperations;
 
 namespace {
 
-class StackExposed: public Stack {
+template <typename Curve>
+class StackExposed: public Stack<Curve> {
     public:
-        using Stack::getReferencesCount;
-        using Stack::set;
-        using Stack::dump;
-        using Stack::getOperationsLists;
-        using Stack::getReferenceIndex;
-        using Stack::dumpOperationsLists;
-        using Stack::clearEvaluated;    
-        using Stack::normalizeOperationsLists;    
+        using Stack<Curve>::getReferencesCount;
+        using Stack<Curve>::set;
+        using Stack<Curve>::dump;
+        using Stack<Curve>::getOperationsLists;
+        using Stack<Curve>::getReferenceIndex;
+        using Stack<Curve>::dumpOperationsLists;
+        using Stack<Curve>::clearEvaluated;    
+        using Stack<Curve>::normalizeOperationsLists;    
 };
 
 TEST(batchOperation, basic) {
-    Stack st;
+    Stack<AltBn128::Curve> st;
 
     Reference r1 = st.alloc(100);
     Reference r2 = st.alloc(150);
