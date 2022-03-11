@@ -2,6 +2,7 @@
 #define PAR_MULTIEXP2
 
 #include "batch_operations.hpp"
+#include "batch_accumulators.hpp"
 
 #define PME2_PACK_FACTOR 2
 #define PME2_MAX_CHUNK_SIZE_BITS 16

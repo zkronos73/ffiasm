@@ -139,12 +139,27 @@ void ParallelMultiexp<Curve>::multiexp(typename Curve::Point &r, typename Curve:
 */
     for (uint32_t i=0; i<nChunks; i++) {
         processChunk(i);
+        for (uint32_t j = 0; j < accsPerChunk; ++j) {
+            printf("########### CHUNK %d ##############\n", j);
+            operations.resolve(accsReference + j);
+        }
+        for (uint32_t j = 0; j < accsPerChunk; ++j) {
+            operations.consolidateReference(accsReference + j);
+        }
+        printf("=== cnt multiexp 1\n");
+        g.printCounters();
+        printf("=== END COUNT BLOCK 1 ===\n");
     /*    for (int index = 0; index < n; ++index) {
             typename Curve::PointAffine p1 = operations.resolve(accsReference + index);
             printf("accs[%d].p = %s\n", index, g.toString(p1).c_str());
         }
         return;*/
         reduce(i, bitsPerChunk);
+        printf("########### CHUNKRESULTS %d ##############\n", i);
+        operations.resolve(chunkResultsReference + i);
+        printf("=== cnt multiexp 2\n");
+        g.printCounters();
+        exit(0);
     }    
     delete[] accs;
     cache = false;

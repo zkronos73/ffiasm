@@ -316,6 +316,8 @@ int Raw<%=name%>::fromRprBE(Element &element, const uint8_t *data, int bytes)
 }
 void Raw<%=name%>::batchInverse (Element *r, Element *a, int64_t count ) 
 {
+    if (!count) return;
+    
     Element *invs = new Element[count];
     Element *prods = new Element[count];
 
@@ -345,6 +347,8 @@ void Raw<%=name%>::batchInverse (Element *r, Element *a, int64_t count )
 void Raw<%=name%>::batchInverse (Element *r, const Element *a, Element *invs, Element *prods, int64_t count ) 
 {
     // Calculate products: a, ab, abc, abcd, ...
+    if (!count) return;
+
     copy(prods[0], a[0]);
     for (int64_t index = 1; index < count; index++)
     {

@@ -2,15 +2,42 @@
 #include <iostream>
 
 #include "gtest/gtest.h"
-#include "alt_bn128.hpp"
 #include "batch_operations.hpp"
 
 using namespace BatchOperations;
 
 namespace {
 
+class IntAsCurvePointAffine {
+    public:
+        int value;
+        IntAsCurvePointAffine(void) { value = 0; };
+        IntAsCurvePointAffine(int _value) { value = _value; };
+        operator int() { return value; };
+        operator std::string() { std::stringstream ss; ss << value; return ss.str(); };
+        friend std::ostream& operator<<(std::ostream& os, const IntAsCurvePointAffine& value);
+};
+
+std::ostream& operator<<(std::ostream& os, const IntAsCurvePointAffine &value)
+{
+    os << value.value;
+    return os;
+}
+
+class IntAsCurve {
+    public:
+        typedef IntAsCurvePointAffine PointAffine;
+        void copy (PointAffine &dst, const PointAffine &src) { dst.value = src.value; };
+        const IntAsCurvePointAffine &zero (void) { return _zero; };
+        bool eq (PointAffine op1, const PointAffine op2) { return op1.value == op2.value; };
+    protected:
+        IntAsCurvePointAffine _zero;
+};
+IntAsCurve fakeCurve;
+
+
 template <typename Curve>
-class StackExposed: public Stack<Curve> {
+class _StackExposed: public Stack<Curve> {
     public:
         using Stack<Curve>::getReferencesCount;
         using Stack<Curve>::set;
@@ -19,15 +46,19 @@ class StackExposed: public Stack<Curve> {
         using Stack<Curve>::getReferenceIndex;
         using Stack<Curve>::dumpOperationsLists;
         using Stack<Curve>::clearEvaluated;    
-        using Stack<Curve>::normalizeOperationsLists;    
+        using Stack<Curve>::normalizeOperationsLists;
+        _StackExposed():Stack<Curve>(fakeCurve){};
 };
 
-TEST(batchOperation, basic) {
-    Stack<AltBn128::Curve> st;
 
-    Reference r1 = st.alloc(100);
-    Reference r2 = st.alloc(150);
-    Reference r3 = st.alloc(150);
+typedef _StackExposed<IntAsCurve> StackExposed;
+TEST(batchOperation, basic) {
+    // StackExposed<IntAsCurve> st(fakeCurve);
+    StackExposed st;
+
+    Reference r1 = st.define("r1", 100);
+    Reference r2 = st.define("r2", 150);
+    Reference r3 = st.define("r3", 150);
 
     ASSERT_EQ(100, r2 - r1);
     ASSERT_EQ(250, r3 - r1);
@@ -37,7 +68,7 @@ TEST(batchOperation, zeroRefenceCount) {
     StackExposed st;
 
     int zeroRefCount1 = st.getReferencesCount(0);
-    Reference r1 = st.alloc(100);
+    Reference r1 = st.define("r1", 100);
     int zeroRefCount2 = st.getReferencesCount(0);
     ASSERT_EQ(100, zeroRefCount2 - zeroRefCount1);    
 }
@@ -45,13 +76,47 @@ TEST(batchOperation, zeroRefenceCount) {
 TEST(batchOperation, sets) {
     StackExposed st;
 
-    Reference r1 = st.alloc(2);
+    Reference r1 = st.define("r1", 2);
+    Reference r2 = st.define("r2", 4);
     st.set(r1+0, 2);
-    st.set(r1+1, 4);
-    ASSERT_EQ(2, st.resolve(r1+0));
-    ASSERT_EQ(4, st.resolve(r1+1));
+    st.set(r1+1, 3);
+    st.set(r2+0, 5);
+    st.set(r2+1, 7);
+    st.set(r2+2, 11);
+    st.set(r2+3, 13);
+
+    st.add(r1+0, r1+0, r2+0);
+    st.add(r1+0, r1+0, r2+1);
+    st.add(r1+0, r1+0, r2+2);
+    st.add(r1+0, r1+0, r2+1);
+    st.add(r1+0, r1+0, r2+3);
+
+    st.add(r1+1, r1+1, r2+3);
+    st.add(r1+1, r1+1, r2+2);
+    st.dbl(r1+1, r1+1);
+    st.dbl(r1+1, r1+1);
+    st.dbl(r1+1, r1+1);
+    st.dbl(r1+1, r1+1);
+    st.add(r1+1, r1+0, r1+1);
+    st.dbl(r1+0, r1+1);
+
+    std::cout << st.getStringAdditionValuesOfReference(r1+0) << "\n";
+    std::cout << st.getStringAdditionValuesOfReference(r1+1) << "\n";
+//     ASSERT_TRUE(fakeCurve.eq(2, st.resolve(r1+0)));
+//    ASSERT_TRUE(fakeCurve.eq(4, st.resolve(r1+1)));
 }
 
+/*
+TEST(batchOperation, sets) {
+    StackExposed st;
+
+    Reference r1 = st.define("r1", 2);
+    st.set(r1+0, 2);
+    st.set(r1+1, 4);
+    ASSERT_TRUE(fakeCurve.eq(2, st.resolve(r1+0)));
+    ASSERT_TRUE(fakeCurve.eq(4, st.resolve(r1+1)));
+}
+/*
 TEST(batchOperation, add) {
     StackExposed st;
 
@@ -139,7 +204,7 @@ TEST(batchOperation, add4) {
     st.dumpOperationsLists(lists);
     st.dump();
 }
-
+*/
 /*
 TEST(altBn128, g1_PlusZero) {
     G1Point p1;

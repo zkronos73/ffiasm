@@ -103,7 +103,8 @@ template <typename Curve>
 void Stack<Curve>::add ( Reference destRef, Reference ref1, Reference ref2, const std::string &source, int line )
 {
     auto index1 = getReferenceIndex(ref1);
-    auto index2 = getReferenceIndex(ref2); 
+    auto index2 = getReferenceIndex(ref2);
+    printf("index1:%ld index2:%ld\n", index1, index2);
     if (!index1) {
         updateReferenceIndex(destRef, index2);
         return;
@@ -116,7 +117,11 @@ void Stack<Curve>::add ( Reference destRef, Reference ref1, Reference ref2, cons
     std::stringstream ss;
     ss << "add(" << getReferenceLabel(ref1) << ":" << index1 << "," << getReferenceLabel(ref2) << ":" << index2 << ") => " << getReferenceLabel(destRef) << 
         " at " << source << ":" << line;
+    printf("ADD %s\n", ss.str().c_str());
+
+    auto indexDest = getReferenceIndex(destRef);
     push(destRef, op_add, index1, index2, ss.str());
+    printf("REFERENCE %ld (%ld => %ld)\n", destRef, indexDest, getReferenceIndex(destRef));
 }
 
 template <typename Curve>
@@ -193,15 +198,23 @@ void Stack<Curve>::updateReferenceIndex ( Reference reference, Index index )
 }
 
 template <typename Curve>
-typename Curve::PointAffine Stack<Curve>::resolve ( Reference reference, int maxDeepLevel )
+typename Curve::PointAffine Stack<Curve>::resolve ( Reference reference, bool consolidate )
 {
     auto index = getReferenceIndex(reference);
-    typename Curve::PointAffine result = iterativeCalculate(index);
+    // typename Curve::PointAffine result = iterativeCalculate(index);
     std::vector<Value> values;
     getAdditionValues(values, index);
+    operations[index].consolidated = true;
     // recursiveGetAdditionValues(values, index);
     printf("COUNT=%'ld\n", values.size());
-    return result;
+    return zeroValue;
+}
+
+template <typename Curve>
+void Stack<Curve>::consolidateReference ( Reference reference )
+{
+    auto index = getReferenceIndex(reference);
+    operations[index].consolidated = true;
 }
 
 template <typename Curve>
@@ -251,6 +264,18 @@ void Stack<Curve>::recursiveGetAdditionValues (std::vector<Value> &values, Index
     return;
 }
 
+template <typename Curve>
+std::string Stack<Curve>::getStringAdditionValuesOfReference ( Reference ref )
+{
+    std::vector<Value> lst;
+    getAdditionValues(lst, getReferenceIndex(ref));
+    std::ostringstream oss;
+    oss << "S[" << lst.size() << "] = {";
+    std::copy(lst.begin(), lst.end(), std::ostream_iterator<Value>(oss, " "));
+    oss << "}" << "\n";
+    return oss.str();        
+}
+
 
 template <typename Curve>
 void Stack<Curve>::getAdditionValues ( std::vector<Value> &values, Index index )
@@ -263,8 +288,13 @@ void Stack<Curve>::getAdditionValues ( std::vector<Value> &values, Index index )
         Index operationIndex = st.top();
         st.pop();
         ++counter;
-        printf("ST[%10ld] index: %10ld   C:%10ld\n", st.size(), operationIndex, counter);
         Element &e = operations[operationIndex];
+        printf("ST[%10ld] index: %10ld   C:%10ld %s\n", st.size(), operationIndex, counter, e.consolidated ? "[CONSOLIDATED]":"" );
+        if (e.consolidated) {
+            // TO-DO references
+            values.push_back(e.value);
+            continue;
+        }
         if (e.evaluated > 5000 && e.operation != op_set) {
             printf("DEAD LOCK on %ld\n", operationIndex);
             for (int i = 0; i < operations.size(); ++i) {
@@ -294,11 +324,11 @@ void Stack<Curve>::getAdditionValues ( std::vector<Value> &values, Index index )
                     printf("PUSH %ld\n", e.oper1);
                     printf("PUSH %ld\n", e.oper2);
                     st.push(e.oper1);
-                    st.push(e.oper2);
-                    continue;
+                    st.push(e.oper2);                    
                     ++addCallCounter;
+                    counter;
                     // g.add(e.value, operations[e.oper1].value, operations[e.oper2].value);
-                    printf("@C add(%ld, %ld)\n", e.oper1, e.oper2);// g.toString(e.value).c_str());
+                    // printf("@C add(%ld, %ld)\n", e.oper1, e.oper2);// g.toString(e.value).c_str());
                     ++e.evaluated;
                     continue;
                 }
@@ -309,7 +339,8 @@ void Stack<Curve>::getAdditionValues ( std::vector<Value> &values, Index index )
                     st.push(e.oper1);
                     st.push(e.oper1);
                     ++dblCallCounter;
-                    // g.dbl(e.value, operations[e.oper1].value);
+                    continue;
+                    g.dbl(e.value, operations[e.oper1].value);
                     // printf("@C %sdbl(%ld)\n", indent.c_str(), e.oper1); // g.toString(e.value).c_str());
                     ++e.evaluated;
                     continue;

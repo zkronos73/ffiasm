@@ -651,11 +651,13 @@ void Curve<BaseField>::printCounters() {
     printf("cntAddMixed: %'d\n", cntAddMixed);
     printf("cntAdd: %'d\n", cntAdd);
     printf("cntAddAffine: %'d\n", cntAddAffine);
+    printf("cntAdd TOTAL: %'d\n", cntAddMixed + cntAdd+ cntAddAffine);
     printf("cntDbl: %'d\n", cntDbl);
     printf("cntDblMixed: %'d\n", cntDblMixed);
+    printf("cntDbl TOTAL: %'d\n", cntDbl + cntDblMixed);
     printf("cntEq: %'d\n", cntEq);
     printf("cntEqMixed: %'d\n", cntEqMixed);
-    printf("cntToAffine: %'d\n", cntToAffine);
+    printf("cntToAffine: %'d\n", cntToAffine);    
 }
 #endif // COUNT_OPS
 

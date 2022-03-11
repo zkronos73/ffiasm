@@ -29,7 +29,7 @@ uint64_t lehmer64() {
 #define EXPECTED_RESULT_2_32 "(11214335563238929817636333449692455681168983913051128543176696602685434833110,19682196534069234051611777524958224662412865849089027703776500470935035076258)"
 #define EXPECTED_RESULT_2_1 "(18094853483684401030214035454673779939429883778299930824975271485319162037351,13688288498368359111250679033419188395420009978839941644881073507868645204619)"
 #define EXPECTED_RESULT_2_2 "(17717503517063967127010656591622579159521290730611161775508432740108962728275,8347292658269310068911278187690526007547188570782947621250465360037527320812)"
-#define EXPECTED_RESULT EXPECTED_RESULT_100000_32
+#define EXPECTED_RESULT EXPECTED_RESULT_1000000_32
 /*
 void generateBigDataFile ( uint64_t n )
 {
@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     close(fd);
     int nscalars = 32;
 
-    N = 100; // 0000;
+    N = 1000000; // 0000;
     printf("N=%d\n", N);
 /*
     // random scalars
@@ -123,7 +123,7 @@ int main(int argc, char **argv)
 */
     G1Point p2;
 
-    printf("Starting multiexp. (mix) \n");
+    printf("cnt ==== Starting multiexp. (mix)  \n");
     G1.resetCounters();
     start = clock();
     G1.multiMulByScalarMix(p2, bases, (uint8_t *)scalars, nscalars, N);
@@ -141,10 +141,10 @@ int main(int argc, char **argv)
 
     G1Point p3;
 
-    printf("Starting multiexp. \n");
+    printf("cnt ==== Starting multiexp. \n");
     G1.resetCounters();
     start = clock();
-    G1.multiMulByScalar(p3, bases, (uint8_t *)scalars, nscalars, N);
+    G1.multiMulByScalarBa(p3, bases, (uint8_t *)scalars, nscalars, N);
     end = clock();
     strResult = G1.toString(p3); 
     printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
@@ -157,5 +157,5 @@ int main(int argc, char **argv)
     printf("Avg time per exp: %.2lf us\n", (cpu_time_used*1000000)/N);
     printf("Exps per second: %.2lf\n", (N / cpu_time_used));
     
-    printf("P1 Better %.02f%%\n", ((double)(total-total2)*100.0)/total);
+    // printf("P1 Better %.02f%%\n", ((double)(total-total2)*100.0)/total);
 }

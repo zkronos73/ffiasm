@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 #include <vector>
+#include <sstream>
+#include <iostream>
+#include <iterator>
+#include <algorithm> 
 
 namespace BatchOperations {
 
@@ -40,33 +44,23 @@ class Stack
 {
     public:
         Stack ( Curve &_g );
-/*          :g(_g)
-        {
-            Element op = { op_set, 0, 0, 0, false };
-
-            // TODO: multithread protection
-            int reference = operations.size();
-            operations.push_back(op);
-
-            references.push_back(0);
-            references.push_back(0);
-            references.push_back(0);
-        };*/
         typedef typename Curve::PointAffine Value;
 
         ~Stack ( void );
         Reference define ( const std::string &label, int size = 1 );
         void copy ( Reference destRef, Reference srcRef );
-        void add ( Reference destRef, Reference opRef1, Reference opRef2, const std::string &source, int line );
+        void add ( Reference destRef, Reference opRef1, Reference opRef2, const std::string &source = "", int line = 0 );
         void isZero ( Reference ref );
         void setZero ( Reference ref );
         void gMulByScalar ( Reference destRef, Reference baseRef, uint8_t* scalar, unsigned int scalarSize );
-        void dbl ( Reference destRef, Reference srcRef, const std::string &source, int line );
-        typename Curve::PointAffine resolve ( Reference reference, int maxDeepLevel = 1000000 );
+        void dbl ( Reference destRef, Reference srcRef, const std::string &source = "", int line = 0 );
+        typename Curve::PointAffine resolve ( Reference reference, bool consolidate = false );
         std::string getPathToResolve ( Reference reference , int maxDeepLevel = 1000000 );
         std::string getReferenceLabel ( Reference reference );
         void getAdditionValues ( std::vector<Value> &values, Index index );
+        std::string getStringAdditionValuesOfReference ( Reference ref );
         void recursiveGetAdditionValues ( std::vector<Value> &values, Index index );
+        void consolidateReference ( Reference reference );
 
 
         void mark ( Reference refence );
@@ -100,6 +94,7 @@ class Stack
             int64_t evaluatedToListIndex;
             int evaluationId;
             std::string extraInfo;
+            bool consolidated;
         };
     // protected:
         Curve &g;

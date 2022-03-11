@@ -5,6 +5,7 @@
 #include "multiexp_mix.hpp"
 #include "multiexp_original.hpp"
 #include "multiexp_tree.hpp"
+#include "multiexp_ba.hpp"
 
 template <typename BaseField>
 class Curve {
@@ -138,6 +139,11 @@ public:
 
     void multiMulByScalarTree(Point &r, PointAffine *bases, uint8_t* scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
         ParallelMultiexpTree<Curve<BaseField>> pm(*this);
+        pm.multiexp(r, bases, scalars, scalarSize, n);
+    }
+
+    void multiMulByScalarBa(Point &r, PointAffine *bases, uint8_t* scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
+        ParallelMultiexpBa<Curve<BaseField>> pm(*this);
         pm.multiexp(r, bases, scalars, scalarSize, n);
     }
 #ifdef COUNT_OPS
