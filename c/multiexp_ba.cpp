@@ -2,15 +2,6 @@
 #include <memory.h>
 #include "misc.hpp"
 
-//    auto _O1 = O1; 
-//    auto _O2 = O2; 
-//    printf("\n## %d: %s\n## %s\n +%s\n = %s\n", __LINE__, #R "=" #O1 "+" #O2,g.toString(_O1).c_str(), g.toString(_O2).c_str(), g.toString(R).c_str()); 
-
-#define __G_ADD__TREE__(R,O1,O2) \
-{ \
-    g.add(R, O1, O2); \
-} 
-
 template <typename Curve>
 uint32_t ParallelMultiexpBa<Curve>::getChunk(uint32_t scalarIdx, uint32_t chunkIdx) 
 {
@@ -66,18 +57,6 @@ void ParallelMultiexpBa<Curve>::reduce ( void )
     }
     batchAcc.calculate();        
 
-    for (uint32_t idChunk = 0; idChunk < nChunks; idChunk++) {
-        nBits = bitsPerChunk;
-        while (nBits > 0) {
-            ndiv2 = 1 << (nBits-1);
-            auto value = batchAcc.getValue(idChunk * accsPerChunk + ndiv2);
-            printf("==> BA-CHUNK-NDIV2 A = 2**%d * %s\n", nBits-1, g.toString(value).c_str());
-            --nBits;
-        }
-    }
-
-    batchAcc.calculate();
-  
     nBits = bitsPerChunk;
     while (nBits > 0) {
         ndiv2 = 1 << (nBits-1);
@@ -96,28 +75,11 @@ void ParallelMultiexpBa<Curve>::reduce ( void )
                 continue;
             }
            
-            if (idChunk == 0) {
-                auto value = batchAcc.getValue(ndiv2abs);
-                auto value2 = batchAcc.getValue(chunkResultRef + idChunk);
-                printf("ndiv2abs:%d\n", ndiv2abs);
-                printf("==> BA-CHUNK-ADD-RESULT[%d] = %s + %s\n", nBits, g.toString(value2).c_str(), g.toString(value).c_str());    
-            }
             batchAcc.add(chunkResultRef + idChunk, ndiv2abs);
         }
         --nBits;
     }
     batchAcc.calculate();
-
-    for (uint32_t idChunk = 0; idChunk < nChunks; idChunk++) {
-        nBits = bitsPerChunk;
-        while (nBits > 0) {
-            ndiv2 = 1 << (nBits-1);
-            auto value = batchAcc.getValue(idChunk * accsPerChunk + ndiv2);
-            printf("==> BA-CHUNK-NDIV2 B = 2**%d * %s\n", nBits-1, g.toString(value).c_str());
-            --nBits;
-        }
-    }
-
 }
 
 template <typename Curve>
@@ -150,9 +112,9 @@ void ParallelMultiexpBa<Curve>::multiexp(typename Curve::Point &r, typename Curv
     
     chunkResultRef = batchAcc.defineAccumulators(nChunks);
     resultRef= batchAcc.defineAccumulators(1);
-    batchAcc.defineAccumulators(1000);
+//    batchAcc.defineAccumulators(1000);
 
-    batchAcc.setup(100000, 100000);
+    batchAcc.setup(10 * n, n);
     
     processChunks();
     batchAcc.calculate();
@@ -167,5 +129,5 @@ void ParallelMultiexpBa<Curve>::multiexp(typename Curve::Point &r, typename Curv
         value = batchAcc.getValue(chunkResultRef + j);
         g.add(r, r, value);
     }
-    batchAcc.printStats();
+    // batchAcc.dumpStats();
 }

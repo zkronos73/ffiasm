@@ -30,104 +30,135 @@ uint64_t lehmer64() {
 #define EXPECTED_RESULT_2_1 "(18094853483684401030214035454673779939429883778299930824975271485319162037351,13688288498368359111250679033419188395420009978839941644881073507868645204619)"
 #define EXPECTED_RESULT_2_2 "(17717503517063967127010656591622579159521290730611161775508432740108962728275,8347292658269310068911278187690526007547188570782947621250465360037527320812)"
 #define EXPECTED_RESULT EXPECTED_RESULT_1000000_32
-/*
-void generateBigDataFile ( uint64_t n )
-{
-    int64_t maxBlock = 100000;
-    uint8_t *scalars = new uint8_t[maxBlock * 32];
 
-    int64_t count = n;
+inline int64_t getRealTimeClockUs ( void )
+{
+    struct timespec tm;
+    clock_gettime(CLOCK_REALTIME, &tm);
+    return tm.tv_sec * 1000000 + tm.tv_nsec / 1000;
+}
+
+void createDataFile ( const std::string &filename, int64_t _n )
+{
+    int64_t n = _n;
+    int fd = creat(filename.c_str(), 0666);
+    write(fd, &n, sizeof(n));
+
+    int64_t block = 10240;
+    uint8_t *scalars = new uint8_t[block * 32];
+    int64_t count = n*4;
     while (count > 0) {
-        int
-        for (int i=0; i<N*4; i++) {
+        int64_t cblock = count > block ? block : count;
+        for (int i=0; i<cblock; i++) {
             *((uint64_t *)(scalars + i*8)) = lehmer64();
         }
-
-
-    printf("%ld %ld\n", read(fd, scalars, sizeof(scalars[0]) * N * 32), sizeof(scalars[0]) * N * 32);
-    printf("%ld %ld\n",read(fd, bases, sizeof(bases[0]) * N), sizeof(bases[0]) * N);
-    close(fd);
-    int nscalars = 32;
-    G1PointAffine *bases = new G1PointAffine[];
-
-    N = 500000; // 0000;
-    printf("N=%d\n", N);
-
-    // random scalars
-    for (int i=0; i<N*4; i++) {
-        *((uint64_t *)(scalars + i*8)) = lehmer64();
+        write(fd, scalars, cblock * 8);
+        count -= cblock;
     }
 
-
-}
-*/
-int main(int argc, char **argv) 
-{
-//     int N = atoi(argv[1]);
-    setlocale(LC_ALL, "en_US.utf-8");
-
-    int N;
-    int fd = open("testdata.dat", 0666);
-    printf("%ld\n",read(fd, &N, sizeof(N)));
-    printf("file contents %d bases\n", N);
-
-    uint8_t *scalars = new uint8_t[N*32];
-    G1PointAffine *bases = new G1PointAffine[N];
-
-    printf("%ld %ld\n", read(fd, scalars, sizeof(scalars[0]) * N * 32), sizeof(scalars[0]) * N * 32);
-    printf("%ld %ld\n",read(fd, bases, sizeof(bases[0]) * N), sizeof(bases[0]) * N);
-    close(fd);
-    int nscalars = 32;
-
-    N = 1000000; // 0000;
-    printf("N=%d\n", N);
-/*
-    // random scalars
-    for (int i=0; i<N*4; i++) {
-        *((uint64_t *)(scalars + i*8)) = lehmer64();
-    }
+    G1PointAffine *bases = new G1PointAffine[block+2];
 
     G1.copy(bases[0], G1.one());
     G1.copy(bases[1], G1.one());
+    
 
-    for (int i=2; i<N; i++) {
-        G1.add(bases[i], bases[i-1], bases[i-2]);
+    count = n;
+    while (count > 0) {
+        int64_t cblock = count > block ? block : count;
+        for (int i=2; i<(cblock + 2); i++) {
+            G1.add(bases[i], bases[i-1], bases[i-2]);
+        }
+        write(fd, bases, cblock * sizeof(bases[0]));
+        G1.copy(bases[0], bases[cblock]);
+        G1.copy(bases[1], bases[cblock+1]);
+    
+        count -= cblock;
     }
-*/    
-/*
-    int fd = creat("testdata.dat", 0666);
-    write(fd, &N, sizeof(N));
-    write(fd, scalars, sizeof(scalars[0]) * N * 32);
-    write(fd, bases, sizeof(bases[0]) * N);
+
     close(fd);
-*/
+}
+
+void loadDataFile ( const std::string &filename, uint8_t *scalars, G1PointAffine *bases, int64_t _n )
+{
+    int64_t n;
+    int fd = open(filename.c_str(), 0666);
+    read(fd, &n, sizeof(n));
+    if (n < _n) {
+        printf("file only contents %ld values, less than required\n", n);
+        exit(EXIT_FAILURE);
+    }
+
+    int64_t block = 10240 * 8;
+    int64_t bytes = _n*32;
+    int64_t bytesRead;
+
+    while (bytes > 0) {
+        bytesRead = read(fd, scalars, bytes > block ? block : bytes);
+        scalars += bytesRead;
+        bytes -= bytesRead;
+    }
+
+    lseek64(fd, sizeof(n) + n * 32, SEEK_SET);
+
+    uint8_t *data = (uint8_t *)bases;
+    bytes = sizeof(bases[0]) * _n;
+    while (bytes > 0) {
+        bytesRead = read(fd, data, bytes > block ? block : bytes);
+        data += bytesRead;
+        bytes -= bytesRead;
+    }
+
+    close(fd);
+}
+
+
+int main(int argc, char **argv) 
+{
+    int nscalars = 32;
+    int n = atoi(argv[1]);
+
+    setlocale(LC_ALL, "en_US.utf-8");
+
+    uint8_t *scalars = new uint8_t[n*32];
+    G1PointAffine *bases = new G1PointAffine[n];
+
+    loadDataFile("multiexp_test_data_128000000.dat", scalars, bases, n);
+
     clock_t start, end;
+    int64_t startT, endT;
     double cpu_time_used;
     std::string strResult;
-/*
+
     G1Point p1;
-    
+/*
     printf("Starting multiexp. (original) \n");
     G1.resetCounters();
     start = clock();
-    G1.multiMulByScalarOriginal(p1, bases, (uint8_t *)scalars, nscalars, N);
+    startT = getRealTimeClockUs();
+    G1.multiMulByScalar(p1, bases, (uint8_t *)scalars, nscalars, n);
     end = clock();
+    endT = getRealTimeClockUs();
+
     strResult = G1.toString(p1); 
     printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
 
     G1.printCounters();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("Time used: %.2lf\n", cpu_time_used);
-    printf("Avg time per exp: %.2lf us\n", (cpu_time_used*1000000)/N);
-    printf("Exps per second: %.2lf\n", (N / cpu_time_used));
-*/
+    printf("Time real: %.4lf\n", (double)(endT - startT)/1000000);
+    printf("Time used: %.4lf\n", cpu_time_used);
+    printf("Avg time per exp: %.4lf us\n", (cpu_time_used*1000000)/n);
+    printf("Exps per second: %.4lf\n", (n / cpu_time_used));
+
+
     G1Point p2;
 
     printf("cnt ==== Starting multiexp. (mix)  \n");
     G1.resetCounters();
     start = clock();
-    G1.multiMulByScalarMix(p2, bases, (uint8_t *)scalars, nscalars, N);
+    startT = getRealTimeClockUs();
+    G1.multiMulByScalarMix(p2, bases, (uint8_t *)scalars, nscalars, n);
     end = clock();
+    endT = getRealTimeClockUs();
     strResult = G1.toString(p2); 
     printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
     int64_t total = G1.cntAddMixed + G1.cntAdd + G1.cntAddAffine;
@@ -135,17 +166,20 @@ int main(int argc, char **argv)
 
     G1.printCounters();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("Time used: %.2lf\n", cpu_time_used);
-    printf("Avg time per exp: %.2lf us\n", (cpu_time_used*1000000)/N);
-    printf("Exps per second: %.2lf\n", (N / cpu_time_used));
-
+    printf("Time real: %.4lf\n", (double)(endT - startT)/1000000);
+    printf("Time used: %.4lf\n", cpu_time_used);
+    printf("Avg time per exp: %.4lf us\n", (cpu_time_used*1000000)/n);
+    printf("Exps per second: %.4lf\n", (n / cpu_time_used));
+*/
     G1Point p3;
 
     printf("cnt ==== Starting multiexp. \n");
     G1.resetCounters();
     start = clock();
-    G1.multiMulByScalarBa(p3, bases, (uint8_t *)scalars, nscalars, N);
+    startT = getRealTimeClockUs();
+    G1.multiMulByScalarBa(p3, bases, (uint8_t *)scalars, nscalars, n);
     end = clock();
+    endT = getRealTimeClockUs();
     strResult = G1.toString(p3); 
     printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
     int64_t total2 = G1.cntAddMixed + G1.cntAdd + G1.cntAddAffine;
@@ -153,9 +187,10 @@ int main(int argc, char **argv)
 
     G1.printCounters();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("Time used: %.2lf\n", cpu_time_used);
-    printf("Avg time per exp: %.2lf us\n", (cpu_time_used*1000000)/N);
-    printf("Exps per second: %.2lf\n", (N / cpu_time_used));
+    printf("Time real: %.4lf\n", (double)(endT - startT)/1000000);
+    printf("Time used: %.4lf\n", cpu_time_used);
+    printf("Avg time per exp: %.4lf us\n", (cpu_time_used*1000000)/n);
+    printf("Exps per second: %.4lf\n", (n / cpu_time_used));
     
     // printf("P1 Better %.02f%%\n", ((double)(total-total2)*100.0)/total);
 }

@@ -3,15 +3,6 @@
 #include <memory.h>
 #include "misc.hpp"
 
-//    auto _O1 = O1; 
-//    auto _O2 = O2; 
-//    printf("\n## %d: %s\n## %s\n +%s\n = %s\n", __LINE__, #R "=" #O1 "+" #O2,g.toString(_O1).c_str(), g.toString(_O2).c_str(), g.toString(R).c_str()); 
-
-#define __G_ADD__MIX__(R,O1,O2) \
-{ \
-    g.add(R, O1, O2); \
-} 
-
 template <typename Curve>
 void ParallelMultiexpMix<Curve>::initAccs() {
     for (int i=0; i<accsPerChunk; i++) {
@@ -39,7 +30,7 @@ void ParallelMultiexpMix<Curve>::processChunk(uint32_t idChunk) {
         if (g.isZero(bases[i])) continue;
         uint32_t chunkValue = getChunk(i, idChunk);
         if (chunkValue) {
-            __G_ADD__MIX__(accs[chunkValue].p, accs[chunkValue].p, bases[i]);
+            g.add(accs[chunkValue].p, accs[chunkValue].p, bases[i]);
         }
     }
 }
@@ -54,25 +45,25 @@ void ParallelMultiexpMix<Curve>::reduce(typename Curve::Point &res, uint32_t nBi
         ndiv2 = 1 << (nBits-1);
         if (nBits==1) {
             g.add(res, res, accs[1].p);
-            printf("==> MIX-CHUNK-NDIV2 A = 2**%d * %s\n", nBits-1, g.toString(accs[ndiv2].p).c_str());
-            printf("==> MIX-CHUNK-NDIV2 B = 2**%d * %s\n", nBits-1, g.toString(accs[ndiv2].p).c_str());
-//            g.copy(accs[1].p, g.zero());
+//            printf("==> MIX-CHUNK-NDIV2 A = 2**%d * %s\n", nBits-1, g.toString(accs[ndiv2].p).c_str());
+            //printf("==> MIX-CHUNK-NDIV2 B = 2**%d * %s\n", nBits-1, g.toString(accs[ndiv2].p).c_str());
+            g.copy(accs[1].p, g.zero());
             return;
         }
 
         for (uint32_t i = 1; i<ndiv2; i++) {
             if (!g.isZero(accs[ndiv2 + i].p)) {
-                __G_ADD__MIX__(accs[i].p, accs[i].p, accs[ndiv2 + i].p);
-                __G_ADD__MIX__(accs[ndiv2].p, accs[ndiv2].p, accs[ndiv2 + i].p);
-//                g.copy(accs[ndiv2 + i].p, g.zero());
+                g.add(accs[i].p, accs[i].p, accs[ndiv2 + i].p);
+                g.add(accs[ndiv2].p, accs[ndiv2].p, accs[ndiv2 + i].p);
+                g.copy(accs[ndiv2 + i].p, g.zero());
             }
         }
         for (u_int32_t i=0; i<nBits-1; i++) g.dbl(accs[ndiv2].p, accs[ndiv2].p);
-        printf("==> MIX-CHUNK-NDIV2 B = 2**%d * %s\n", nBits-1, g.toString(accs[ndiv2].p).c_str());
-        printf("==> MIX-CHUNK-ADD-RESULT[%d] = %s + %s\n", nBits, g.toString(res).c_str(), g.toString(accs[ndiv2].p).c_str());    
+//         printf("==> MIX-CHUNK-NDIV2 B = 2**%d * %s\n", nBits-1, g.toString(accs[ndiv2].p).c_str());
+//        printf("==> MIX-CHUNK-ADD-RESULT[%d] = %s + %s\n", nBits, g.toString(res).c_str(), g.toString(accs[ndiv2].p).c_str());    
 
-        __G_ADD__MIX__(res, res, accs[ndiv2].p);
-//        g.copy(accs[ndiv2].p, g.zero());
+        g.add(res, res, accs[ndiv2].p);
+        g.copy(accs[ndiv2].p, g.zero());
         --nBits;
     }    
 }
@@ -116,23 +107,23 @@ void ParallelMultiexpMix<Curve>::multiexp(typename Curve::Point &r, typename Cur
         }
         return;*/
         reduce(chunkResults[i], bitsPerChunk);
-        memset(accs, 0, sizeof(accs[0]) * accsPerChunk);
+//        memset(accs, 0, sizeof(accs[0]) * accsPerChunk);
     }
     // g.printCounters();
     // return;
-
+/*
     for (uint32_t i=0; i<nChunks; i++) {
         typename Curve::Point p = chunkResults[i];
         printf("==> MIX-CHUNK-RESULT[%d] = %s\n", i, g.toString(p).c_str());
         // break;
     }    
-
+*/
     delete[] accs;
 
     g.copy(r, chunkResults[nChunks-1]);
     for  (int j=nChunks-2; j>=0; j--) {
         for (uint32_t k=0; k<bitsPerChunk; k++) g.dbl(r,r);
-        __G_ADD__MIX__(r, r, chunkResults[j]);
+        g.add(r, r, chunkResults[j]);
     }
 
     delete[] chunkResults; 

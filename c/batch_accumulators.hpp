@@ -1,6 +1,9 @@
 #ifndef __FFIASM__BATCH_ACCUMULATORS__H__
 #define __FFIASM__BATCH_ACCUMULATORS__H__
 
+
+#define BATCH_ACCUMULATORS_STATS 
+
 template <typename Curve>
 class BatchAccumulators
 {
@@ -19,8 +22,6 @@ class BatchAccumulators
         void add(int64_t accumulatorId, typename Curve::PointAffine &value);
         void add(int64_t accumulatorId, int64_t valueAccumulatorId);
         void dbl(int64_t accumulatorId );
-        void fakeMultiAdd ( void );
-        void fakeCalculate ( void );
         bool calculateOnlyOneLoop ( void );
         void calculate( void ) { while (!calculateOnlyOneLoop()); }
         void clear ( void );
@@ -29,7 +30,7 @@ class BatchAccumulators
         typename Curve::PointAffine getValue ( int64_t accumulatorId );
         bool isZero ( int64_t accumulatorId );
         int64_t defineAccumulators ( int64_t count );
-        std::string dumpStats ( void );
+        void dumpStats ( void );
         void clearStats ( void );
 
     protected:
@@ -58,7 +59,7 @@ class BatchAccumulators
         void prepareAccumulatorsToNextRound ( void );
         void resize ( void );
         void internalAdd ( int64_t accumulatorId, typename Curve::PointAffine &value, bool internal );
-
+        void multiAdd ( void );
 };
 
 #include "batch_accumulators.cpp"

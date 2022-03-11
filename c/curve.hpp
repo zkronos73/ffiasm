@@ -3,8 +3,6 @@
 #include "exp.hpp"
 #include "multiexp.hpp"
 #include "multiexp_mix.hpp"
-#include "multiexp_original.hpp"
-#include "multiexp_tree.hpp"
 #include "multiexp_ba.hpp"
 
 template <typename BaseField>
@@ -127,18 +125,8 @@ public:
         pm.multiexp(r, bases, scalars, scalarSize, n);
     }
 
-    void multiMulByScalarOriginal(Point &r, PointAffine *bases, uint8_t* scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
-        ParallelMultiexpOriginal<Curve<BaseField>> pm(*this);
-        pm.multiexp(r, bases, scalars, scalarSize, n);
-    }
-
     void multiMulByScalarMix(Point &r, PointAffine *bases, uint8_t* scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
         ParallelMultiexpMix<Curve<BaseField>> pm(*this);
-        pm.multiexp(r, bases, scalars, scalarSize, n);
-    }
-
-    void multiMulByScalarTree(Point &r, PointAffine *bases, uint8_t* scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
-        ParallelMultiexpTree<Curve<BaseField>> pm(*this);
         pm.multiexp(r, bases, scalars, scalarSize, n);
     }
 
