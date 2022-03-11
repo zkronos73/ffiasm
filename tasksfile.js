@@ -97,7 +97,7 @@ function buildBatchOperations() {
         " -Igoogletest-release-1.10.0/googletest/include"+
         " -I."+
         " -I../c"+
-        " ../c/batch_operations.cpp"+
+//        " ../c/batch_operations.cpp"+
         " ../c/batch_operations_test.cpp"+
         " ../c/misc.cpp"+
         " fq.cpp"+
