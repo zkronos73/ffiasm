@@ -667,8 +667,8 @@ void Curve<BaseField>::multiAdd(PointAffine *p3, PointAffine *p1, PointAffine *p
     cntAddAffine++;
 #endif // COUNT_OPS
     const auto p3AlreadyCalculated = -1;
-    int64_t *eqs = new int64_t [count];
-    typename BaseField::Element *lambdas = new typename BaseField::Element[count];
+//    int64_t *eqs = new int64_t [count];
+    typename BaseField::Element *lambdas = (typename BaseField::Element *)malloc(sizeof(typename BaseField::Element) * count);
     u_int64_t lambdaIndex = 0;
 
     for (auto index = 0; index < count; ++index) {
@@ -677,7 +677,7 @@ void Curve<BaseField>::multiAdd(PointAffine *p3, PointAffine *p1, PointAffine *p
         // auto &_p1 = p1[index];
         // auto &_p2 = p2[index];
         // auto &_eqs = eqs[index];
-        if (isZero(p1[index])) {
+/*        if (isZero(p1[index])) {
             copy(p3[index], p2[index]);
             eqs[index] = p3AlreadyCalculated;
             continue;
@@ -686,9 +686,10 @@ void Curve<BaseField>::multiAdd(PointAffine *p3, PointAffine *p1, PointAffine *p
             copy(p3[index], p1[index]);
             eqs[index] = p3AlreadyCalculated;
             continue;
-        }
-        eqs[index] = F.eq(p1[index].x, p2[index].x) && F.eq(p1[index].y, p2[index].y);
-        if (eqs[index]) {
+        }*/
+/*        eqs[index] = F.eq(p1[index].x, p2[index].x) && F.eq(p1[index].y, p2[index].y);
+        if (eqs[index]) {*/
+        if (F.eq(p1[index].x, p2[index].x) && F.eq(p1[index].y, p2[index].y)) {
             F.add(lambdas[lambdaIndex++], p1[index].y, p1[index].y);
         }
         else {
@@ -711,9 +712,10 @@ void Curve<BaseField>::multiAdd(PointAffine *p3, PointAffine *p1, PointAffine *p
         auto &_eqs = eqs[index];
         auto &_lambda = lambdas[lambdaIndex];*/
 
-        if (eqs[index] == p3AlreadyCalculated) continue;
+        // if (eqs[index] == p3AlreadyCalculated) continue;
 
-        if (eqs[index]) {            
+//        if (eqs[index]) {            
+        if (F.eq(p1[index].x, p2[index].x) && F.eq(p1[index].y, p2[index].y)) {
             // l = l * (3 * p1.x**2) + a
             F.mul(lambdas[lambdaIndex], lambdas[lambdaIndex], F.add(F.mul(F.square(p1[index].x), 3), fa));
         }
@@ -730,15 +732,17 @@ void Curve<BaseField>::multiAdd(PointAffine *p3, PointAffine *p1, PointAffine *p
         
         ++lambdaIndex;
     }
-    free(eqs);
+//    free(eqs);
     free(lambdas);
 }
 
-#define P1(X) p[X].p1
-#define P2(X) p[X].p2
-#define P3(X) p[X].p3
-#define EQS(X) p[X].eqs
-#define LAMBDA(X) p[X].lambda
+#define P1(X) p[X].left
+#define P2(X) p[X].right
+#define P3(X) p[X].result
+// #define EQS(X) p[X].eqs
+#define EQS(X) eqs[X]
+// #define LAMBDA(X) p[X].inverse.lambda
+#define LAMBDA(X) lambdas[X]
 
 template <typename BaseField>
 void Curve<BaseField>::multiAdd2(AddPointAffine *p, u_int64_t count) {
@@ -746,9 +750,9 @@ void Curve<BaseField>::multiAdd2(AddPointAffine *p, u_int64_t count) {
     cntAddAffine++;
 #endif // COUNT_OPS
     const auto p3AlreadyCalculated = -1;
-    int64_t *eqs = new int64_t [count];
-    typename BaseField::Element *lambdas = new typename BaseField::Element[count];
     u_int64_t lambdaIndex = 0;
+    int64_t *eqs = (int64_t *)malloc(sizeof(int64_t) * count);
+    typename BaseField::Element *lambdas = (typename BaseField::Element *)malloc(sizeof(typename BaseField::Element) * count);
 
     for (auto index = 0; index < count; ++index) {
 //        __builtin_prefetch(p1 + index + 8);
@@ -777,6 +781,7 @@ void Curve<BaseField>::multiAdd2(AddPointAffine *p, u_int64_t count) {
     }
 
     auto lambdaCount = lambdaIndex;
+//     F.batchInverse(&(p->inverse), sizeof(p[0]), lambdaCount);
     F.batchInverse(lambdas, lambdas, lambdaCount);
     lambdaIndex = 0;
     for (auto index = 0; index < count; ++index) {
@@ -809,8 +814,8 @@ void Curve<BaseField>::multiAdd2(AddPointAffine *p, u_int64_t count) {
         
         ++lambdaIndex;
     }
-    free(eqs);
     free(lambdas);
+    free(eqs);
 }
 
 

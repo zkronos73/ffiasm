@@ -87,6 +87,12 @@ public:
         <%=name%>RawElement v;
     };
 
+    struct BatchInverseData {
+        Element lambda;
+        Element inv;
+        Element prod;
+    };
+        
 private:
     Element fZero;
     Element fOne;
@@ -135,6 +141,8 @@ public:
     void exp(Element &r, const Element &base, uint8_t* scalar, unsigned int scalarSize);
     void batchInverse (Element *r, Element *a, int64_t count );
     void batchInverse (Element *r, const Element *a, Element *invs, Element *prods, int64_t count );
+    void batchInverse (BatchInverseData *data, int64_t count );
+    void batchInverse (BatchInverseData *data, int64_t size, int64_t count );
     
     void inline toMontgomery(Element &r, const Element &a) { <%=name%>_rawToMontgomery(r.v, a.v); };
     void inline fromMontgomery(Element &r, const Element &a) { <%=name%>_rawFromMontgomery(r.v, a.v); };

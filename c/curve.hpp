@@ -23,11 +23,11 @@ public:
     };
 
     struct AddPointAffine {
-        PointAffine p1;
-        PointAffine p2;
-        PointAffine p3;
-        PointAffine lambda;
-        bool eqs;
+        PointAffine left;
+        PointAffine right;
+        PointAffine result;
+        // typename BaseField::BatchInverseData inverse;
+        // bool eqs;
     };
 private: 
 

@@ -1,7 +1,16 @@
 #include <omp.h>
 #include <memory.h>
+#include <time.h>
 #include "misc.hpp"
 
+inline int64_t getRealTimeClockUs ( void );
+/*
+{
+    struct timespec tm;
+    clock_gettime(CLOCK_REALTIME, &tm);
+    return tm.tv_sec * 1000000 + tm.tv_nsec / 1000;
+}
+*/
 template <typename Curve>
 uint32_t ParallelMultiexpBa<Curve>::getChunk(uint32_t scalarIdx, uint32_t chunkIdx) 
 {
@@ -21,12 +30,15 @@ template <typename Curve>
 void ParallelMultiexpBa<Curve>::processChunks ( void ) 
 {
     uint32_t chunkValue;
-
-    for(uint32_t i=0; i<n; i++) {
-        if (g.isZero(bases[i])) continue;
-        for (uint32_t idChunk = 0; idChunk < nChunks; ++idChunk) {
-            if (chunkValue = getChunk(i, idChunk)) {
-                batchAcc.addPoint(idChunk * accsPerChunk + chunkValue, bases[i]);
+    int64_t offset;
+    
+    // #pragma omp parallel for
+    for (uint32_t idChunk = 0; idChunk < nChunks; ++idChunk) {
+        offset = idChunk * accsPerChunk;
+        for(uint32_t i=0; i<n; i++) {
+            if (g.isZero(bases[i])) continue;
+            if ((chunkValue = getChunk(i, idChunk))) {
+                batchAcc.addPoint(offset + chunkValue, bases[i]);
             }
         }
     }
@@ -95,7 +107,8 @@ void ParallelMultiexpBa<Curve>::multiexp(typename Curve::Point &r, typename Curv
 //     nThreads = _nThreads==0 ? omp_get_max_threads() : _nThreads;
 // batchAcc.dumpStats();
 //    printf("== (%s:%d) == cntToAffine: %d\n", __FILE__, __LINE__,g.cntToAffine);
-
+    uint64_t t1, t2, t3, t4, t5, t6, t7;
+    t1 = getRealTimeClockUs();
     bases = _bases;
     scalars = _scalars;
     scalarSize = _scalarSize;
@@ -125,11 +138,15 @@ void ParallelMultiexpBa<Curve>::multiexp(typename Curve::Point &r, typename Curv
 //    batchAcc.defineAccumulators(1000);
 
     batchAcc.setup(10 * n, n);
-    
+    t2 = getRealTimeClockUs();
     processChunks();
+    t3 = getRealTimeClockUs();
     batchAcc.calculate();
+    t4 = getRealTimeClockUs();
     reduce();
+    t5 = getRealTimeClockUs();
     batchAcc.calculate();
+    t6 = getRealTimeClockUs();
 
     typename Curve::PointAffine value;
     value = batchAcc.getValue(chunkResultRef + nChunks - 1);
@@ -139,5 +156,8 @@ void ParallelMultiexpBa<Curve>::multiexp(typename Curve::Point &r, typename Curv
         value = batchAcc.getValue(chunkResultRef + j);
         g.add(r, r, value);
     }
+    t7 = getRealTimeClockUs();
+    printf("setup:%'ld processChunks:%'ld calculate:%'ld reduce:%'ld calculate:%'ld final:%'ld\n",
+        t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6);
     // batchAcc.dumpStats();
 }

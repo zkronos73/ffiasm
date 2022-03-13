@@ -23,7 +23,8 @@ BatchAccumulators<Curve>::BatchAccumulators (Curve &_g)
     valuesSize = 0;
     accumulators = NULL;
     accumulatorsCount = 0;
-    leftValues = rightValues = resultValues = NULL;
+    // leftValues = rightValues = resultValues = NULL;
+    values = NULL;
     accumulatorIds = NULL;
     currentLoop = 0;
     g.copy(zero, g.zeroAffine());
@@ -49,9 +50,10 @@ void BatchAccumulators<Curve>::setup (int64_t _initialValues, int64_t _deltaValu
     accumulators = (Accumulator *)malloc(accumulatorsCount * sizeof(accumulators[0]));
     clear();
 
-    leftValues = (typename Curve::PointAffine *)malloc(valuesSize * sizeof(leftValues[0]));
-    rightValues = (typename Curve::PointAffine *)malloc(valuesSize * sizeof(rightValues[0]));
-    resultValues = (typename Curve::PointAffine *)malloc(valuesSize * sizeof(resultValues[0]));
+    // leftValues = (typename Curve::PointAffine *)malloc(valuesSize * sizeof(leftValues[0]));
+    // rightValues = (typename Curve::PointAffine *)malloc(valuesSize * sizeof(rightValues[0]));
+    // resultValues = (typename Curve::PointAffine *)malloc(valuesSize * sizeof(resultValues[0]));
+    values = (typename Curve::AddPointAffine *)malloc(valuesSize * sizeof(values[0]));
     accumulatorIds = (int64_t *)calloc(valuesSize, sizeof(accumulatorIds[0]));
 }
 
@@ -89,7 +91,7 @@ void BatchAccumulators<Curve>::freeValues (void)
         accumulators = NULL;
     }
 
-    if (leftValues) {
+/*    if (leftValues) {
         free(leftValues);
         leftValues = NULL;
     }
@@ -100,6 +102,10 @@ void BatchAccumulators<Curve>::freeValues (void)
     if (resultValues) {
         free(resultValues);
         resultValues = NULL;
+    }*/
+    if (values) {
+        free(values);
+        values = NULL;
     }
 
     if (accumulatorIds) {
@@ -169,8 +175,8 @@ void BatchAccumulators<Curve>::internalAdd ( int64_t accumulatorId, typename Cur
                 int64_t index = incValuesCount();
                 accumulator.ready = false;
             // assert(accumulator.index >= 0 && accumulator.index < valuesSize);
-                COPY(leftValues[index], accumulator.value);
-                COPY(rightValues[index], value);
+                COPY(values[index].left, accumulator.value);
+                COPY(values[index].right, value);
                 COPY(accumulator.value, zero);
                 accumulatorIds[index] = accumulatorId;
             }
@@ -201,8 +207,8 @@ void BatchAccumulators<Curve>::internalAdd ( int64_t accumulatorId, typename Cur
     }
 
     int64_t index = incValuesCount();
-    COPY(leftValues[index], accumulator.singleValue);
-    COPY(rightValues[index], value);
+    COPY(values[index].left, accumulator.singleValue);
+    COPY(values[index].right, value);
     ZERO(accumulator.singleValue);
     accumulatorIds[index] = accumulatorId;
     #ifdef __DEBUG__
@@ -239,9 +245,10 @@ template <typename Curve>
 void BatchAccumulators<Curve>::resize ( void )
 {
     valuesSize += deltaValues;
-    leftValues = (typename Curve::PointAffine *)realloc(leftValues, valuesSize * sizeof(leftValues[0]));
+/*    leftValues = (typename Curve::PointAffine *)realloc(leftValues, valuesSize * sizeof(leftValues[0]));
     rightValues = (typename Curve::PointAffine *)realloc(rightValues, valuesSize * sizeof(rightValues[0]));
-    resultValues = (typename Curve::PointAffine *)realloc(resultValues, valuesSize * sizeof(resultValues[0]));
+    resultValues = (typename Curve::PointAffine *)realloc(resultValues, valuesSize * sizeof(resultValues[0]));*/
+    values = (typename Curve::AddPointAffine *)realloc(values, valuesSize * sizeof(values[0]));
     accumulatorIds = (int64_t *)realloc(accumulatorIds, valuesSize * sizeof(accumulatorIds[0]));
 }
 
@@ -287,18 +294,18 @@ bool BatchAccumulators<Curve>::calculateOnlyOneLoop ( void )
         if (accumulator.lastLoop != currentLoop) {
             accumulator.lastLoop = currentLoop;
             if (!IS_ZERO(accumulator.singleValue)) {
-                internalAdd(accumulatorId, resultValues[index], false);
+                internalAdd(accumulatorId, values[index].result, false);
                 continue;
             }
             accumulator.ready = true;
-            COPY(accumulator.value, resultValues[index]);
+            COPY(accumulator.value, values[index].result);
             continue;
         }
         else if (accumulator.ready) {
             COPY(accumulator.singleValue, accumulator.value);
             accumulator.ready = false;
         }
-        internalAdd(accumulatorId, resultValues[index], true);
+        internalAdd(accumulatorId, values[index].result, true);
     }
     return (valuesCount == 0);
 }
@@ -324,14 +331,17 @@ void BatchAccumulators<Curve>::multiAdd ( void )
 //    dumpStats();
 //    printf("== (%s:%d) == cntToAffine: %d\n", __FILE__, __LINE__,g.cntToAffine);
 
+    // #pragma omp parallel for
     // g.multiAdd(resultValues, leftValues, rightValues, valuesCount);
+    g.multiAdd2(values, valuesCount);
     
-    #pragma omp parallel for
+    /*
     for (int block = 0; block < nBlocks; ++ block) {
         int count = (block == (nBlocks - 1)) ? valuesLastBlock : valuesBlock;
         int offset = block * valuesBlock;
-        g.multiAdd(resultValues + offset, leftValues + offset, rightValues + offset, count);
-    }
+        // g.multiAdd(resultValues + offset, leftValues + offset, rightValues + offset, count);
+        g.multiAdd(values + offset, count);
+    }*/
 }
 
 template <typename Curve>

@@ -138,83 +138,141 @@ void loadDataFile ( const std::string &filename, uint8_t *scalars, G1PointAffine
 
 int main(int argc, char **argv) 
 {
+    int opt;
     int nscalars = 32;
-    int n = atoi(argv[1]);
+    int n = 1000000;
+    int times = 1;
+    bool flgSaveDataFile = false;
+    bool flgLoadDataFile = true;
+    bool flgMixTest = false;
+    bool flgOriginalTest = false;
+    bool flgParallelTest = false;
+    std::string dataFilename = "multiexp_test_data_128000000.dat";
 
     setlocale(LC_ALL, "en_US.utf-8");
 
+    while ((opt = getopt(argc, argv, "n:t:213s:mavhs:l:")) != -1) {
+        switch (opt) {
+            case 'n':
+                n = atoi(optarg);
+                break;
+
+            case 't':
+                times = atoi(optarg);
+                break;
+
+            case '2':
+                flgMixTest = true;
+                break;
+
+            case '1':
+                flgOriginalTest = true;
+                break;
+
+            case '3':
+                flgParallelTest = true;
+                break;
+
+/*            case 'h':
+                help();
+                exit(EXIT_SUCCESS);
+            */
+            case 's':
+                flgSaveDataFile = true;
+                dataFilename = optarg;
+                break;
+
+            case 'l':
+                flgLoadDataFile = true;
+                dataFilename = optarg;
+                break;
+                
+            default: /* '?' */
+                // help();
+                exit(EXIT_FAILURE);
+        }
+    }
+
+    if (flgSaveDataFile) {
+        flgLoadDataFile = false;
+    }
+    
     uint8_t *scalars = new uint8_t[n*32];
     G1PointAffine *bases = new G1PointAffine[n];
 
-    loadDataFile("multiexp_test_data_128000000.dat", scalars, bases, n);
+    loadDataFile(dataFilename, scalars, bases, n);
 
     clock_t start, end;
     int64_t startT, endT;
     double cpu_time_used;
     std::string strResult;
 
-    G1Point p1;
-/*
-    printf("Starting multiexp. (original) \n");
-    G1.resetCounters();
-    start = clock();
-    startT = getRealTimeClockUs();
-    G1.multiMulByScalar(p1, bases, (uint8_t *)scalars, nscalars, n);
-    end = clock();
-    endT = getRealTimeClockUs();
+    if (flgOriginalTest) {
+        G1Point p1;
 
-    strResult = G1.toString(p1); 
-    printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
+        printf("Starting multiexp. (original) \n");
+        G1.resetCounters();
+        start = clock();
+        startT = getRealTimeClockUs();
+        G1.multiMulByScalar(p1, bases, (uint8_t *)scalars, nscalars, n);
+        end = clock();
+        endT = getRealTimeClockUs();
 
-    G1.printCounters();
-    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("Time real: %.4lf\n", (double)(endT - startT)/1000000);
-    printf("Time used: %.4lf\n", cpu_time_used);
-    printf("Avg time per exp: %.4lf us\n", (cpu_time_used*1000000)/n);
-    printf("Exps per second: %.4lf\n", (n / cpu_time_used));
+        strResult = G1.toString(p1); 
+        printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
 
+        G1.printCounters();
+        cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+        printf("Time real: %.4lf\n", (double)(endT - startT)/1000000);
+        printf("Time used: %.4lf\n", cpu_time_used);
+        printf("Avg time per exp: %.4lf us\n", (cpu_time_used*1000000)/n);
+        printf("Exps per second: %.4lf\n", (n / cpu_time_used));
+    }
 
-    G1Point p2;
+    if (flgMixTest) {        
+        G1Point p2;
 
-    printf("cnt ==== Starting multiexp. (mix)  \n");
-    G1.resetCounters();
-    start = clock();
-    startT = getRealTimeClockUs();
-    G1.multiMulByScalarMix(p2, bases, (uint8_t *)scalars, nscalars, n);
-    end = clock();
-    endT = getRealTimeClockUs();
-    strResult = G1.toString(p2); 
-    printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
-    int64_t total = G1.cntAddMixed + G1.cntAdd + G1.cntAddAffine;
-    printf("P1 cntAddTotal:%'ld\n", total);
+        printf("cnt ==== Starting multiexp. (mix)  \n");
+        G1.resetCounters();
+        start = clock();
+        startT = getRealTimeClockUs();
+        G1.multiMulByScalarMix(p2, bases, (uint8_t *)scalars, nscalars, n);
+        end = clock();
+        endT = getRealTimeClockUs();
+        strResult = G1.toString(p2); 
+        printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
+        int64_t total = G1.cntAddMixed + G1.cntAdd + G1.cntAddAffine;
+        printf("P1 cntAddTotal:%'ld\n", total);
 
-    G1.printCounters();
-    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("Time real: %.4lf\n", (double)(endT - startT)/1000000);
-    printf("Time used: %.4lf\n", cpu_time_used);
-    printf("Avg time per exp: %.4lf us\n", (cpu_time_used*1000000)/n);
-    printf("Exps per second: %.4lf\n", (n / cpu_time_used));
-*/
-    G1Point p3;
+        G1.printCounters();
+        cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+        printf("Time real: %.4lf\n", (double)(endT - startT)/1000000);
+        printf("Time used: %.4lf\n", cpu_time_used);
+        printf("Avg time per exp: %.4lf us\n", (cpu_time_used*1000000)/n);
+        printf("Exps per second: %.4lf\n", (n / cpu_time_used));
+    }
 
-    printf("cnt ==== Starting multiexp. \n");
-    G1.resetCounters();
-    start = clock();
-    startT = getRealTimeClockUs();
-    G1.multiMulByScalarBa(p3, bases, (uint8_t *)scalars, nscalars, n);
-    end = clock();
-    endT = getRealTimeClockUs();
-    strResult = G1.toString(p3); 
-    printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
-    int64_t total2 = G1.cntAddMixed + G1.cntAdd + G1.cntAddAffine;
-    printf("P1 cntAddTotal:%'ld\n", total2);
+    if (flgParallelTest) {
+        G1Point p3;
 
-    G1.printCounters();
-    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("Time real: %.4lf\n", (double)(endT - startT)/1000000);
-    printf("Time used: %.4lf\n", cpu_time_used);
-    printf("Avg time per exp: %.4lf us\n", (cpu_time_used*1000000)/n);
-    printf("Exps per second: %.4lf\n", (n / cpu_time_used));
-    
+        printf("cnt ==== Starting multiexp. \n");
+        G1.resetCounters();
+        start = clock();
+        startT = getRealTimeClockUs();
+        G1.multiMulByScalarBa(p3, bases, (uint8_t *)scalars, nscalars, n);
+        end = clock();
+        endT = getRealTimeClockUs();
+        strResult = G1.toString(p3); 
+        printf("P1 (%s):%s\n", (strResult == EXPECTED_RESULT ? "OK":"********FAIL********"), strResult.c_str());
+        int64_t total2 = G1.cntAddMixed + G1.cntAdd + G1.cntAddAffine;
+        printf("P1 cntAddTotal:%'ld\n", total2);
+
+        G1.printCounters();
+        cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+        printf("Time real: %.4lf\n", (double)(endT - startT)/1000000);
+        printf("Time used: %.4lf\n", cpu_time_used);
+        printf("Avg time per exp: %.4lf us\n", (cpu_time_used*1000000)/n);
+        printf("Exps per second: %.4lf\n", (n / cpu_time_used));
+    }        
     // printf("P1 Better %.02f%%\n", ((double)(total-total2)*100.0)/total);
 }

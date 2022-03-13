@@ -324,9 +324,9 @@ void BatchAccumulators<Curve>::multiAdd ( void )
 //    dumpStats();
 //    printf("== (%s:%d) == cntToAffine: %d\n", __FILE__, __LINE__,g.cntToAffine);
 
+    // #pragma omp parallel for
     // g.multiAdd(resultValues, leftValues, rightValues, valuesCount);
     
-    #pragma omp parallel for
     for (int block = 0; block < nBlocks; ++ block) {
         int count = (block == (nBlocks - 1)) ? valuesLastBlock : valuesBlock;
         int offset = block * valuesBlock;

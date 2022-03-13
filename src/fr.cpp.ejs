@@ -318,8 +318,10 @@ void Raw<%=name%>::batchInverse (Element *r, Element *a, int64_t count )
 {
     if (!count) return;
     
-    Element *invs = new Element[count];
-    Element *prods = new Element[count];
+    // Element *invs = new Element[count];
+    // Element *prods = new Element[count];
+    Element *invs = (Element*)malloc(count * sizeof(Element));
+    Element *prods = (Element*)malloc(count * sizeof(Element));
 
     // Calculate products: a, ab, abc, abcd, ...
     copy(prods[0], a[0]);
@@ -366,6 +368,70 @@ void Raw<%=name%>::batchInverse (Element *r, const Element *a, Element *invs, El
     for (int64_t index = 1; index < count; index++)
     {
         mul(r[index], invs[index], prods[index - 1]);
+    }
+}
+
+void Raw<%=name%>::batchInverse (BatchInverseData *data, int64_t count ) 
+{
+    // Calculate products: a, ab, abc, abcd, ...
+    if (!count) return;
+
+    copy(data[0].prod, data[0].lambda);
+    for (int64_t index = 1; index < count; index++)
+    {
+        mul(data[index].prod, data[index-1].prod, data[index].lambda);
+    }
+    
+    // Calculate inverses: 1/a, 1/ab, 1/abc, 1/abcd, ...
+    inv(data[count - 1].inv, data[count - 1].prod);
+    for (int64_t index = count - 1; index > 0; index--)
+    {
+        mul(data[index-1].inv, data[index].inv, data[index].lambda);
+    }
+    
+    copy(data[0].lambda, data[0].inv);
+    for (int64_t index = 1; index < count; index++)
+    {
+        mul(data[index].lambda, data[index].inv, data[index - 1].prod);
+    }
+}
+
+void Raw<%=name%>::batchInverse (BatchInverseData *data, int64_t size, int64_t count ) 
+{
+    // Calculate products: a, ab, abc, abcd, ...
+    if (!count) return;
+
+    copy(data[0].prod, data[0].lambda);
+    BatchInverseData *prev = data;
+    BatchInverseData *cur = (BatchInverseData *)(((uint8_t *)prev) + size);
+
+    for (int64_t index = 1; index < count; index++)
+    {
+        // mul(data[index].prod, data[index-1].prod, data[index].lambda);
+        mul(cur->prod, prev->prod, cur->lambda);
+        prev = cur;
+        cur = (BatchInverseData *)(((uint8_t *)cur) + size);
+    }
+    
+    // Calculate inverses: 1/a, 1/ab, 1/abc, 1/abcd, ...
+    // inv(data[count - 1].inv, data[count - 1].prod);
+    inv(cur->inv, cur->prod);
+    for (int64_t index = count - 1; index > 0; index--)
+    {
+        // mul(data[index-1].inv, data[index].inv, data[index].lambda);
+        mul(prev->inv, cur->inv, cur->lambda);
+        cur = prev;
+        prev = (BatchInverseData *)(((uint8_t *)prev) - size);
+    }
+    
+    // copy(data[0].lambda, data[0].inv);
+    copy(data->lambda, data->inv);
+    for (int64_t index = 1; index < count; index++)
+    {
+        // mul(data[index].lamba, data[index].inv, data[index - 1].prod);
+        mul(cur->lambda, cur->inv, prev->prod);
+        prev = cur;
+        cur = (BatchInverseData *)(((uint8_t *)cur) + size);
     }
 }
 
