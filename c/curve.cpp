@@ -674,25 +674,25 @@ void Curve<BaseField>::multiAdd(PointAffine *p3, PointAffine *p1, PointAffine *p
     for (auto index = 0; index < count; ++index) {
 //        __builtin_prefetch(p1 + index + 8);
 //        __builtin_prefetch(p2 + index + 8);
-        auto &_p1 = p1[index];
-        auto &_p2 = p2[index];
-        auto &_eqs = eqs[index];
-        if (isZero(_p1)) {
-            copy(p3[index], _p2);
-            _eqs = p3AlreadyCalculated;
+        // auto &_p1 = p1[index];
+        // auto &_p2 = p2[index];
+        // auto &_eqs = eqs[index];
+        if (isZero(p1[index])) {
+            copy(p3[index], p2[index]);
+            eqs[index] = p3AlreadyCalculated;
             continue;
         }
-        if (isZero(_p2)) {
-            copy(p3[index], _p1);
-            _eqs = p3AlreadyCalculated;
+        if (isZero(p2[index])) {
+            copy(p3[index], p1[index]);
+            eqs[index] = p3AlreadyCalculated;
             continue;
         }
-        _eqs = F.eq(_p1.x, _p2.x) && F.eq(_p1.y, _p2.y);
-        if (_eqs) {
-            F.add(lambdas[lambdaIndex++], _p1.y, _p1.y);
+        eqs[index] = F.eq(p1[index].x, p2[index].x) && F.eq(p1[index].y, p2[index].y);
+        if (eqs[index]) {
+            F.add(lambdas[lambdaIndex++], p1[index].y, p1[index].y);
         }
         else {
-            F.sub(lambdas[lambdaIndex++], _p2.x, _p1.x);
+            F.sub(lambdas[lambdaIndex++], p2[index].x, p1[index].x);
         }
         // F.copy(lambdas[lambdaIndex++], _eqs ? F.add(_p1.y, _p1.y) : F.sub(_p2.x,_p1.x));
     }
@@ -705,28 +705,107 @@ void Curve<BaseField>::multiAdd(PointAffine *p3, PointAffine *p1, PointAffine *p
 //        __builtin_prefetch(p2 + index + 8);
 //        __builtin_prefetch(eqs + index + 8);
 //        __builtin_prefetch(lambdas + lambdaIndex + 8);
-        auto &_p1 = p1[index];
+        /* auto &_p1 = p1[index];
         auto &_p2 = p2[index];
         auto &_p3 = p3[index];
         auto &_eqs = eqs[index];
-        auto &_lambda = lambdas[lambdaIndex];
+        auto &_lambda = lambdas[lambdaIndex];*/
 
-        if (_eqs == p3AlreadyCalculated) continue;
+        if (eqs[index] == p3AlreadyCalculated) continue;
 
-        if (_eqs) {            
+        if (eqs[index]) {            
             // l = l * (3 * p1.x**2) + a
-            F.mul(_lambda, _lambda, F.add(F.mul(F.square(_p1.x), 3), fa));
+            F.mul(lambdas[lambdaIndex], lambdas[lambdaIndex], F.add(F.mul(F.square(p1[index].x), 3), fa));
         }
         else {
             // l = l * (p2.y - p1.y)
-            F.mul(_lambda, _lambda, F.sub(_p2.y, _p1.y));
+            F.mul(lambdas[lambdaIndex], lambdas[lambdaIndex], F.sub(p2[index].y, p1[index].y));
         }
 
         // p3.x = l**2 - (p1.x + p2.x) 
-        F.sub(_p3.x, F.square(_lambda), F.add(_p1.x, _p2.x));
+        F.sub(p3[index].x, F.square(lambdas[lambdaIndex]), F.add(p1[index].x, p2[index].x));
 
         // p3.y = l * (p1.x - p3.x) - p1.y
-        F.sub(_p3.y, F.mul(_lambda, F.sub(_p1.x, _p3.x)), _p1.y);
+        F.sub(p3[index].y, F.mul(lambdas[lambdaIndex], F.sub(p1[index].x, p3[index].x)), p1[index].y);
+        
+        ++lambdaIndex;
+    }
+    free(eqs);
+    free(lambdas);
+}
+
+#define P1(X) p[X].p1
+#define P2(X) p[X].p2
+#define P3(X) p[X].p3
+#define EQS(X) p[X].eqs
+#define LAMBDA(X) p[X].lambda
+
+template <typename BaseField>
+void Curve<BaseField>::multiAdd2(AddPointAffine *p, u_int64_t count) {
+#ifdef COUNT_OPS
+    cntAddAffine++;
+#endif // COUNT_OPS
+    const auto p3AlreadyCalculated = -1;
+    int64_t *eqs = new int64_t [count];
+    typename BaseField::Element *lambdas = new typename BaseField::Element[count];
+    u_int64_t lambdaIndex = 0;
+
+    for (auto index = 0; index < count; ++index) {
+//        __builtin_prefetch(p1 + index + 8);
+//        __builtin_prefetch(p2 + index + 8);
+        // auto &_p1 = P1(index);
+        // auto &_p2 = P2(index);
+        // auto &_eqs = EQS(index);
+        if (isZero(P1(index))) {
+            copy(P3(index), P2(index));
+            EQS(index) = p3AlreadyCalculated;
+            continue;
+        }
+        if (isZero(P2(index))) {
+            copy(P3(index), P1(index));
+            EQS(index) = p3AlreadyCalculated;
+            continue;
+        }
+        EQS(index) = F.eq(P1(index).x, P2(index).x) && F.eq(P1(index).y, P2(index).y);
+        if (EQS(index)) {
+            F.add(LAMBDA(lambdaIndex++), P1(index).y, P1(index).y);
+        }
+        else {
+            F.sub(LAMBDA(lambdaIndex++), P2(index).x, P1(index).x);
+        }
+        // F.copy(LAMBDA(lambdaIndex++), _eqs ? F.add(_p1.y, _p1.y) : F.sub(_p2.x,_p1.x));
+    }
+
+    auto lambdaCount = lambdaIndex;
+    F.batchInverse(lambdas, lambdas, lambdaCount);
+    lambdaIndex = 0;
+    for (auto index = 0; index < count; ++index) {
+//        __builtin_prefetch(p1 + index + 8);
+//        __builtin_prefetch(p2 + index + 8);
+//        __builtin_prefetch(eqs + index + 8);
+//        __builtin_prefetch(lambdas + lambdaIndex + 8);
+        /* auto &_p1 = P1(index);
+        auto &_p2 = P2(index);
+        auto &_p3 = P3(index);
+        auto &_eqs = EQS(index);
+        auto &_lambda = LAMBDA(lambdaIndex);*/
+
+        if (EQS(index) == p3AlreadyCalculated) continue;
+
+        if (EQS(index)) {            
+            // l = l * (3 * p1.x**2) + a
+            F.mul(LAMBDA(lambdaIndex), LAMBDA(lambdaIndex), F.add(F.mul(F.square(P1(index).x), 3), fa));
+        }
+        else {
+            // l = l * (p2.y - p1.y)
+            F.mul(LAMBDA(lambdaIndex), LAMBDA(lambdaIndex), F.sub(P2(index).y, P1(index).y));
+        }
+
+        // p3.x = l**2 - (p1.x + p2.x) 
+        F.sub(P3(index).x, F.square(LAMBDA(lambdaIndex)), F.add(P1(index).x, P2(index).x));
+
+        // p3.y = l * (p1.x - p3.x) - p1.y
+        F.sub(P3(index).y, F.mul(LAMBDA(lambdaIndex), F.sub(P1(index).x, P3(index).x)), P1(index).y);
         
         ++lambdaIndex;
     }

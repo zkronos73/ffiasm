@@ -22,6 +22,13 @@ public:
         typename BaseField::Element y;
     };
 
+    struct AddPointAffine {
+        PointAffine p1;
+        PointAffine p2;
+        PointAffine p3;
+        PointAffine lambda;
+        bool eqs;
+    };
 private: 
 
     void initCurve(typename BaseField::Element &aa, typename BaseField::Element &ab, typename BaseField::Element &agx, typename BaseField::Element &agy);
@@ -70,6 +77,7 @@ public:
     void add(Point &p3, PointAffine &p1, PointAffine &p2);
     void add(Point &p3, PointAffine &p1, Point &p2) { add(p3, p2, p1); };
     void multiAdd(PointAffine *p3, PointAffine *p1, PointAffine *p2, u_int64_t count);
+    void multiAdd2(AddPointAffine *p, u_int64_t count);
 
     void add(PointAffine &p3, Point &p1, Point &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
     void add(PointAffine &p3, Point &p1, PointAffine &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };

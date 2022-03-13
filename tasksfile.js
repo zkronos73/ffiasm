@@ -115,10 +115,31 @@ function testBatchOperations() {
     sh("./batch_operations_test -v", {cwd: "build", nopipe: true});
 }
 
+function buildBatchAccumulators() {
+    sh("g++" +
+        " -Igoogletest-release-1.10.0/googletest/include"+
+        " -I."+
+        " -I../c"+
+        " ../c/batch_accumulators_test.cpp"+
+        " ../c/misc.cpp"+
+        " fq.cpp"+
+        " fq.o"+
+        " fr.cpp"+
+        " fr.o"+
+        " googletest-release-1.10.0/libgtest.a"+
+        " -o batch_accumulators_test" +
+        " -fmax-errors=5 -pthread -std=c++11 -fopenmp -lgmp -g", {cwd: "build", nopipe: true}
+    );
+}
+
+function testBatchAccumulators() {
+    buildBatchAccumulators();
+    sh("./batch_accumulators_test -v", {cwd: "build", nopipe: true});
+}
+
 
 function benchMultiExpG1() {
-    sh("g++ -O3 -g" +
-        " -Igoogletest-release-1.10.0/googletest/include"+
+    sh("g++ -O3" +
         " -I."+
         " -I../c"+
         " ../c/naf.cpp"+
@@ -131,10 +152,11 @@ function benchMultiExpG1() {
         " fr.cpp"+
         " fr.o"+
         // " googletest-release-1.10.0/libgtest.a"+
-        " -Wl,-z,stack-size=4194304"+
+//        " -Wl,-z,stack-size=4194304"+
         " -o multiexp_g1_benchmark" +
-        " -lgmp -pthread -std=c++11 -fopenmp -DCOUNT_OPS" , {cwd: "build", nopipe: true}
-    );
+        " -lgmp -pthread -std=c++17 -DCOUNT_OPS" , {cwd: "build", nopipe: true}
+//        " -lgmp -pthread -std=c++17 -fopenmp -DCOUNT_OPS" , {cwd: "build", nopipe: true}
+);
     sh("./multiexp_g1_benchmark 1000000", {cwd: "build", nopipe: true});
 }
 
@@ -168,6 +190,8 @@ cli({
     testAltBn128,
     buildBatchOperations,
     testBatchOperations,
+    buildBatchAccumulators,
+    testBatchAccumulators,
     benchCurveAdds,
     buildCurveAdds,
     benchMultiExpG1,

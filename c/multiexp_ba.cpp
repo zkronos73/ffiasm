@@ -26,7 +26,7 @@ void ParallelMultiexpBa<Curve>::processChunks ( void )
         if (g.isZero(bases[i])) continue;
         for (uint32_t idChunk = 0; idChunk < nChunks; ++idChunk) {
             if (chunkValue = getChunk(i, idChunk)) {
-                batchAcc.add(idChunk * accsPerChunk + chunkValue, bases[i]);
+                batchAcc.addPoint(idChunk * accsPerChunk + chunkValue, bases[i]);
             }
         }
     }
@@ -38,6 +38,9 @@ void ParallelMultiexpBa<Curve>::reduce ( void )
     uint32_t p2ref, ndiv2, ndiv2abs, chunkOffset;
     uint32_t nBits = bitsPerChunk;
 
+//    batchAcc.dumpStats();
+//    printf("== (%s:%d) == cntToAffine: %d\n", __FILE__, __LINE__,g.cntToAffine);
+    
     while (nBits > 0) {
         ndiv2 = 1 << (nBits-1);
         for (uint32_t idChunk = 0; idChunk < nChunks; idChunk++) {
@@ -56,6 +59,8 @@ void ParallelMultiexpBa<Curve>::reduce ( void )
         --nBits;
     }
     batchAcc.calculate();        
+//    batchAcc.dumpStats();
+//    printf("== (%s:%d) == cntToAffine: %d\n", __FILE__, __LINE__,g.cntToAffine);
 
     nBits = bitsPerChunk;
     while (nBits > 0) {
@@ -80,18 +85,23 @@ void ParallelMultiexpBa<Curve>::reduce ( void )
         --nBits;
     }
     batchAcc.calculate();
+//    batchAcc.dumpStats();
+//    printf("== (%s:%d) == cntToAffine: %d\n", __FILE__, __LINE__,g.cntToAffine);
 }
 
 template <typename Curve>
 void ParallelMultiexpBa<Curve>::multiexp(typename Curve::Point &r, typename Curve::PointAffine *_bases, uint8_t* _scalars, uint32_t _scalarSize, uint32_t _n, uint32_t _nThreads) 
 {
 //     nThreads = _nThreads==0 ? omp_get_max_threads() : _nThreads;
+// batchAcc.dumpStats();
+//    printf("== (%s:%d) == cntToAffine: %d\n", __FILE__, __LINE__,g.cntToAffine);
+
     bases = _bases;
     scalars = _scalars;
     scalarSize = _scalarSize;
     n = _n;
 
-//    ThreadLimit threadLimit (nThreads);
+    // ThreadLimit threadLimit(1);
 
     if (n==0) {
         g.copy(r, g.zero());

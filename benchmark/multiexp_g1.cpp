@@ -40,9 +40,14 @@ inline int64_t getRealTimeClockUs ( void )
 
 void createDataFile ( const std::string &filename, int64_t _n )
 {
+    int64_t bytes, bytesWritten;
     int64_t n = _n;
+
     int fd = creat(filename.c_str(), 0666);
-    write(fd, &n, sizeof(n));
+    if (write(fd, &n, sizeof(n)) != sizeof(n)) {
+        printf("ERROR writting header E: %d %s\n", errno, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
 
     int64_t block = 10240;
     uint8_t *scalars = new uint8_t[block * 32];
@@ -52,7 +57,12 @@ void createDataFile ( const std::string &filename, int64_t _n )
         for (int i=0; i<cblock; i++) {
             *((uint64_t *)(scalars + i*8)) = lehmer64();
         }
-        write(fd, scalars, cblock * 8);
+        bytes = cblock * 8;
+        bytesWritten = write(fd, scalars, bytes);
+        if (bytes != bytesWritten) {
+            printf("ERROR writting %ld bytes (scalars), write only %ld bytes. E:%d %s\n", bytes, bytesWritten, errno, strerror(errno));
+            exit(EXIT_FAILURE);
+        }
         count -= cblock;
     }
 
@@ -68,7 +78,12 @@ void createDataFile ( const std::string &filename, int64_t _n )
         for (int i=2; i<(cblock + 2); i++) {
             G1.add(bases[i], bases[i-1], bases[i-2]);
         }
-        write(fd, bases, cblock * sizeof(bases[0]));
+        bytes = cblock * sizeof(bases[0]);
+        bytesWritten = write(fd, bases, bytes);
+        if (bytes != bytesWritten) {
+            printf("ERROR writting %ld bytes (bases), write only %ld bytes. E:%d %s\n", bytes, bytesWritten, errno, strerror(errno));
+            exit(EXIT_FAILURE);
+        }
         G1.copy(bases[0], bases[cblock]);
         G1.copy(bases[1], bases[cblock+1]);
     
@@ -82,9 +97,18 @@ void loadDataFile ( const std::string &filename, uint8_t *scalars, G1PointAffine
 {
     int64_t n;
     int fd = open(filename.c_str(), 0666);
-    read(fd, &n, sizeof(n));
+    if (read(fd, &n, sizeof(n)) != sizeof(n)) {
+        printf("ERROR reading header E: %d %s\n", errno, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    if (n > (1000 * 1000 * 1000)) {
+        printf("ERROR number of records %'ld is too big\n", n);
+        exit(EXIT_FAILURE);
+    }
+
     if (n < _n) {
-        printf("file only contents %ld values, less than required\n", n);
+        printf("ERROR file only contents %'ld values, less than required (%'ld)\n", n, _n);
         exit(EXIT_FAILURE);
     }
 

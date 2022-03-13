@@ -19,7 +19,7 @@ class BatchAccumulators
         void setup(int64_t _initialValues, int64_t _deltaValues);
 
         // TODO: value as const, but need modify Curve::copy
-        void add(int64_t accumulatorId, typename Curve::PointAffine &value);
+        void addPoint(int64_t accumulatorId, typename Curve::PointAffine &value);
         void add(int64_t accumulatorId, int64_t valueAccumulatorId);
         void dbl(int64_t accumulatorId );
         bool calculateOnlyOneLoop ( void );
@@ -36,10 +36,10 @@ class BatchAccumulators
     protected:
 
         typedef struct {
-            int64_t index;
-            int64_t count;
-            bool ready;
             typename Curve::PointAffine value;
+            typename Curve::PointAffine singleValue;
+            int32_t lastLoop;
+            bool ready;
         } Accumulator;
 
         Accumulator *accumulators;
@@ -48,11 +48,14 @@ class BatchAccumulators
         int64_t valuesSize;
         int64_t initialValues;
         int64_t deltaValues;
+        int32_t currentLoop;
 
         typename Curve::PointAffine *leftValues;
         typename Curve::PointAffine *rightValues;
         typename Curve::PointAffine *resultValues;
         int64_t *accumulatorIds;
+
+        typename Curve::PointAffine zero;
 
         void freeValues ( void );
         void prepareSingleValues ( void );
@@ -60,6 +63,7 @@ class BatchAccumulators
         void resize ( void );
         void internalAdd ( int64_t accumulatorId, typename Curve::PointAffine &value, bool internal );
         void multiAdd ( void );
+        int64_t incValuesCount ( void );
 };
 
 #include "batch_accumulators.cpp"

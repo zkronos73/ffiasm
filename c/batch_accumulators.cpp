@@ -7,6 +7,14 @@
 
 #include "batch_accumulators.hpp"
 
+// #define ZERO(X) g.copy(X, g.zeroAffine())
+// #define COPY(D,S) g.copy(D,S)
+#define IS_ZERO(X) g.isZero(X)
+
+#define ZERO(X) X=zero
+#define COPY(D,S) D=S
+// #define IS_ZERO(X) memcmp(&X,&zero, sizeof(zero)) == 0
+
 template <typename Curve>
 BatchAccumulators<Curve>::BatchAccumulators (Curve &_g)
     :g(_g)
@@ -17,6 +25,8 @@ BatchAccumulators<Curve>::BatchAccumulators (Curve &_g)
     accumulatorsCount = 0;
     leftValues = rightValues = resultValues = NULL;
     accumulatorIds = NULL;
+    currentLoop = 0;
+    g.copy(zero, g.zeroAffine());
     clearStats();
 }
 
@@ -48,12 +58,13 @@ void BatchAccumulators<Curve>::setup (int64_t _initialValues, int64_t _deltaValu
 template <typename Curve>
 void BatchAccumulators<Curve>::clear (void)
 {
+    // #pragma omp parallel for
     for (int64_t index = 0; index < accumulatorsCount; ++index) {
         Accumulator &accumulator = accumulators[index];
-        accumulator.index = -1;
         accumulator.ready = true;
-        accumulator.count = 0;
-        g.copy(accumulator.value, g.zero());
+        accumulator.lastLoop = 0;
+        ZERO(accumulator.value);
+        ZERO(accumulator.singleValue);
     }    
 
     valuesCount = 0;
@@ -63,7 +74,7 @@ template <typename Curve>
 bool BatchAccumulators<Curve>::isZero (int64_t accumulatorId)
 {
     // assert(accumulatorId >=0 && accumulatorId < accumulatorsCount);
-    return g.isZero(accumulators[accumulatorId].value);
+    return IS_ZERO(accumulators[accumulatorId].value);
 }
 
 
@@ -101,7 +112,7 @@ template <typename Curve>
 void BatchAccumulators<Curve>::dbl ( int64_t accumulatorId )
 {
     auto value = getValue(accumulatorId);
-    add(accumulatorId, value, false);    
+    addPoint(accumulatorId, value, false);    
 }
 
 template <typename Curve>
@@ -113,16 +124,31 @@ void BatchAccumulators<Curve>::add ( int64_t accumulatorId, int64_t valueAccumul
 }
 
 template <typename Curve>
-void BatchAccumulators<Curve>::add ( int64_t accumulatorId, typename Curve::PointAffine &value )
+void BatchAccumulators<Curve>::addPoint ( int64_t accumulatorId, typename Curve::PointAffine &value )
 {
     internalAdd(accumulatorId, value, false);
+}
+
+template <typename Curve>
+int64_t BatchAccumulators<Curve>::incValuesCount ( void )
+{
+    // printf("incValuesCount(valuesCount:%ld)\n", valuesCount);
+    ++valuesCount;    
+    if (valuesCount >= valuesSize) {
+        resize();
+    }
+
+    if (valuesCount > maxValues) {
+        maxValues = valuesCount;
+    }
+    return valuesCount - 1;
 }
 
 template <typename Curve>
 void BatchAccumulators<Curve>::internalAdd ( int64_t accumulatorId, typename Curve::PointAffine &value, bool internal )
 {
     // assert(accumulatorId >= 0 && accumulatorId < accumulatorsCount);
-    if (g.isZero(value)) {
+    if (IS_ZERO(value)) {
         return;
     }
 
@@ -131,52 +157,72 @@ void BatchAccumulators<Curve>::internalAdd ( int64_t accumulatorId, typename Cur
     // TEST
     // g.add(accumulator.value, accumulator.value, value);
 
-    accumulator.ready = false;
-
+    #ifdef __DEBUG__
+    std::cout << "\x1b[1;33m/** BEFORE ** VALUE " << g.toString(value) << " acc[" << accumulatorId << "] ready:" << accumulator.ready << " value:" << g.toString(accumulator.value) 
+              << " singleValue:" << g.toString(accumulator.singleValue) 
+              << " internal:" << internal
+              << "\x1b[0m\n";
+    #endif
     if (!internal) {
-        if ((valuesCount + 1) >= valuesSize) {
-            resize();
-        }
-        if (!accumulator.count) {
-            accumulator.index = valuesCount++;
+        if (accumulator.ready) {
+            if (!IS_ZERO(accumulator.value)) {
+                int64_t index = incValuesCount();
+                accumulator.ready = false;
             // assert(accumulator.index >= 0 && accumulator.index < valuesSize);
-            g.copy(leftValues[accumulator.index], accumulator.value);
-            accumulatorIds[accumulator.index] = accumulatorId;
-            ++accumulator.count;
+                COPY(leftValues[index], accumulator.value);
+                COPY(rightValues[index], value);
+                COPY(accumulator.value, zero);
+                accumulatorIds[index] = accumulatorId;
+            }
+            else {
+                COPY(accumulator.value, value);
+            }
+            #ifdef __DEBUG__
+            std::cout << "\x1b[33m\\** AFTER1 ** acc[" << accumulatorId << "] ready:" << accumulator.ready << " value:" << g.toString(accumulator.value) 
+              << " singleValue:" << g.toString(accumulator.singleValue) 
+              << " internal:" << internal
+              << "\x1b[0m\n";
+            #endif
+            return;
         }
     }
+    accumulator.ready = false;
     
     // If is there a single value, and on right to complete the pair.
-    if (accumulator.index >= 0) {
-        // assert(accumulator.index >= 0 && accumulator.index < valuesSize);
-        g.copy(rightValues[accumulator.index], value);
-        accumulator.index = -1;
+    if (IS_ZERO(accumulator.singleValue)) {
+        COPY(accumulator.singleValue, value);
+        #ifdef __DEBUG__
+        std::cout << "\x1b[33m\\** AFTER2 ** acc[" << accumulatorId << "] ready:" << accumulator.ready << " value:" << g.toString(accumulator.value) 
+            << " singleValue:" << g.toString(accumulator.singleValue) 
+            << " internal:" << internal
+            << "\x1b[0m\n";
+        #endif
         return;
     }
 
-    if (!internal) {
-        ++accumulator.count;
-    }
-
-    accumulator.index = valuesCount++;
-    if (valuesCount > maxValues) {
-        maxValues = valuesCount;
-    }
-    // assert(accumulator.index >= 0 && accumulator.index < valuesSize);
-    g.copy(leftValues[accumulator.index], value);
-    accumulatorIds[accumulator.index] = accumulatorId;
+    int64_t index = incValuesCount();
+    COPY(leftValues[index], accumulator.singleValue);
+    COPY(rightValues[index], value);
+    ZERO(accumulator.singleValue);
+    accumulatorIds[index] = accumulatorId;
+    #ifdef __DEBUG__
+    std::cout << "\x1b[33m\\** AFTER3 ** acc[" << accumulatorId << "] ready:" << accumulator.ready << " value:" << g.toString(accumulator.value) 
+        << " singleValue:" << g.toString(accumulator.singleValue) 
+        << " internal:" << internal
+        << "\x1b[0m\n";
+    #endif
 }
 
 
 template <typename Curve>
 void BatchAccumulators<Curve>::prepareSingleValues ( void )
 {
-    #pragma omp parallel for
-    for (int64_t index = 0; index < accumulatorsCount; ++index) {
+    // #pragma omp parallel for
+/*    for (int64_t index = 0; index < accumulatorsCount; ++index) {
         if (accumulators[index].index < 0) continue;
         // assert(accumulators[index].index >= 0 && accumulators[index].index < valuesSize);
-        g.copy(rightValues[accumulators[index].index], g.zero());
-    }
+        ZERO(rightValues[accumulators[index].index]);
+    }*/
 }
 
 template <typename Curve>
@@ -203,34 +249,54 @@ void BatchAccumulators<Curve>::resize ( void )
 template <typename Curve>
 bool BatchAccumulators<Curve>::calculateOnlyOneLoop ( void )
 {
+    // printf("calculateOnlyOneLoop valuesCount:%ld\n", valuesCount);
     if (!valuesCount) {
         return true;
     }
-    prepareSingleValues();
+    // prepareSingleValues();
 
+    ++currentLoop;
     multiAdd();
 
-    for (int64_t index = 0; index < valuesCount; ++index ) {
+/*    for (int64_t index = 0; index < valuesCount; ++index ) {
         int64_t accumulatorId = accumulatorIds[index];
         Accumulator &accumulator = accumulators[accumulatorId];
 
         if (accumulator.count > 1) continue;
         
-        g.copy(accumulator.value, resultValues[index]);
+        COPY(accumulator.value, resultValues[index]);
         accumulator.ready = true;
     }
 
     prepareAccumulatorsToNextRound();
-    
+*/    
     int64_t oldValuesCount = valuesCount;
     valuesCount = 0;
 
     for (int64_t index = 0; index < oldValuesCount; ++index ) {
-        int64_t accumulatorId = accumulatorIds[index];
+        int64_t accumulatorId = accumulatorIds[index];  
         Accumulator &accumulator = accumulators[accumulatorId];
 
-        if (!accumulator.count) {            
-            continue;            
+        #ifdef __DEBUG__
+        std::cout << "\x1b[34m** INDEX ** " << index << " RESULT:" << g.toString(resultValues[index]) << " acc[" << accumulatorId << "] ready:" << accumulator.ready << " value:" << g.toString(accumulator.value) 
+                << " singleValue:" << g.toString(accumulator.singleValue)
+                << " lastLoop:" << accumulator.lastLoop << " currentLoop:" << currentLoop
+                << "\x1b[0m\n";
+        #endif
+
+        if (accumulator.lastLoop != currentLoop) {
+            accumulator.lastLoop = currentLoop;
+            if (!IS_ZERO(accumulator.singleValue)) {
+                internalAdd(accumulatorId, resultValues[index], false);
+                continue;
+            }
+            accumulator.ready = true;
+            COPY(accumulator.value, resultValues[index]);
+            continue;
+        }
+        else if (accumulator.ready) {
+            COPY(accumulator.singleValue, accumulator.value);
+            accumulator.ready = false;
         }
         internalAdd(accumulatorId, resultValues[index], true);
     }
@@ -254,8 +320,13 @@ void BatchAccumulators<Curve>::multiAdd ( void )
     int valuesBlock = valuesCount > 32 ? valuesCount >> 3 : valuesCount;
     int nBlocks = valuesCount / valuesBlock;
     int valuesLastBlock = valuesCount - (nBlocks - 1) * valuesBlock;
+    
+//    dumpStats();
+//    printf("== (%s:%d) == cntToAffine: %d\n", __FILE__, __LINE__,g.cntToAffine);
 
-    #pragma omp parallel for
+    // #pragma omp parallel for
+    // g.multiAdd(resultValues, leftValues, rightValues, valuesCount);
+    
     for (int block = 0; block < nBlocks; ++ block) {
         int count = (block == (nBlocks - 1)) ? valuesLastBlock : valuesBlock;
         int offset = block * valuesBlock;
@@ -266,18 +337,10 @@ void BatchAccumulators<Curve>::multiAdd ( void )
 template <typename Curve>
 void BatchAccumulators<Curve>::prepareAccumulatorsToNextRound ( void )
 {
-    #pragma omp parallel for
-    for (int64_t index = 0; index < accumulatorsCount; ++index ) {
-        Accumulator &accumulator = accumulators[index];
-        accumulator.index = -1;
-        if (accumulator.count > 1) {            
-            // divide by 2, but if it's odd add one, as up division            
-            accumulator.count = (accumulator.count >> 1) + (accumulator.count & 0x01);
-        }
-        else {
-            accumulator.count = 0;
-        }
-    }
+    // #pragma omp parallel for
+/*    for (int64_t index = 0; index < accumulatorsCount; ++index ) {
+        accumulators[index].count = 0;
+    }*/
 }
 
 template <typename Curve>
