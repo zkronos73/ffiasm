@@ -135,7 +135,6 @@ void loadDataFile ( const std::string &filename, uint8_t *scalars, G1PointAffine
     close(fd);
 }
 
-
 int main(int argc, char **argv) 
 {
     int opt;
@@ -195,6 +194,8 @@ int main(int argc, char **argv)
 
     if (flgSaveDataFile) {
         flgLoadDataFile = false;
+        createDataFile(dataFilename, n);
+        exit(EXIT_SUCCESS);
     }
     
     uint8_t *scalars = new uint8_t[n*32];
