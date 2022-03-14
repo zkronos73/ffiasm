@@ -152,10 +152,8 @@ function benchMultiExpG1() {
         " fr.cpp"+
         " fr.o"+
         // " googletest-release-1.10.0/libgtest.a"+
-//        " -Wl,-z,stack-size=4194304"+
         " -o multiexp_g1_benchmark" +
-        " -lgmp -pthread -std=c++17 -DCOUNT_OPS" , {cwd: "build", nopipe: true}
-        //" -lgmp -pthread -std=c++17 -fopenmp -DCOUNT_OPS" , {cwd: "build", nopipe: true}
+        " -lgmp -pthread -std=c++17 -fopenmp -DCOUNT_OPS" , {cwd: "build", nopipe: true}
 );
     sh("./multiexp_g1_benchmark 1000000", {cwd: "build", nopipe: true});
 }
