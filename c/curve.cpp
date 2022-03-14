@@ -58,7 +58,7 @@ void Curve<BaseField>::initCurve(typename BaseField::Element &aa, typename BaseF
 }
 
 template <typename BaseField>
-void inline Curve<BaseField>::mulByA(typename BaseField::Element &r, typename BaseField::Element &ab) {
+void inline Curve<BaseField>::mulByA(typename BaseField::Element &r, const typename BaseField::Element &ab) {
     switch (typeOfA) {
         case a_is_zero: F.copy(r, F.zero()); break;
         case a_is_one: F.copy(r, ab); break;
@@ -86,7 +86,7 @@ void inline Curve<BaseField>::mulByA(typename BaseField::Element &r, typename Ba
     ZZZ3 = ZZZ1*ZZZ2*PPP
 */
 template <typename BaseField>
-void Curve<BaseField>::add(Point &p3, Point &p1, Point &p2) {
+void Curve<BaseField>::add(Point &p3, const Point &p1, const Point &p2) {
 #ifdef COUNT_OPS
     cntAdd++;
 #endif // COUNT_OPS
@@ -180,7 +180,7 @@ void Curve<BaseField>::add(Point &p3, Point &p1, Point &p2) {
 */
 
 template <typename BaseField>
-void Curve<BaseField>::add(Point &p3, Point &p1, PointAffine &p2) {
+void Curve<BaseField>::add(Point &p3, const Point &p1, const PointAffine &p2) {
 #ifdef COUNT_OPS
     cntAddMixed++;
 #endif // COUNT_OPS
@@ -261,7 +261,7 @@ void Curve<BaseField>::add(Point &p3, Point &p1, PointAffine &p2) {
     ZZZ3 = PPP
 */
 template <typename BaseField>
-void Curve<BaseField>::add(Point &p3, PointAffine &p1, PointAffine &p2) {
+void Curve<BaseField>::add(Point &p3, const PointAffine &p1, const PointAffine &p2) {
 #ifdef COUNT_OPS
     cntAddAffine++;
 #endif // COUNT_OPS
@@ -335,7 +335,7 @@ void Curve<BaseField>::add(Point &p3, PointAffine &p1, PointAffine &p2) {
 
 */
 template <typename BaseField>
-void Curve<BaseField>::dbl(Point &p3, Point &p1) {
+void Curve<BaseField>::dbl(Point &p3, const Point &p1) {
 #ifdef COUNT_OPS
     cntDbl++;
 #endif // COUNT_OPS
@@ -406,7 +406,7 @@ void Curve<BaseField>::dbl(Point &p3, Point &p1) {
     ZZZ3 = W
 */
 template <typename BaseField>
-void Curve<BaseField>::dbl(Point &p3, PointAffine &p1) {
+void Curve<BaseField>::dbl(Point &p3, const PointAffine &p1) {
 #ifdef COUNT_OPS
     cntDblMixed++;
 #endif // COUNT_OPS
@@ -456,7 +456,7 @@ void Curve<BaseField>::dbl(Point &p3, PointAffine &p1) {
 }     
 
 template <typename BaseField>
-bool Curve<BaseField>::eq(Point &p1, Point &p2) {
+bool Curve<BaseField>::eq(const Point &p1, const Point &p2) {
 #ifdef COUNT_OPS
     cntEq++;
 #endif // COUNT_OPS
@@ -492,7 +492,7 @@ bool Curve<BaseField>::eq(Point &p1, Point &p2) {
 
 
 template <typename BaseField>
-bool Curve<BaseField>::eq(Point &p1, PointAffine &p2) {
+bool Curve<BaseField>::eq(const Point &p1, const PointAffine &p2) {
 #ifdef COUNT_OPS
     cntEqMixed++;
 #endif // COUNT_OPS
@@ -521,23 +521,23 @@ bool Curve<BaseField>::eq(Point &p1, PointAffine &p2) {
 }
 
 template <typename BaseField>
-bool Curve<BaseField>::eq(PointAffine &p1, PointAffine &p2) {
+bool Curve<BaseField>::eq(const PointAffine &p1, const PointAffine &p2) {
     return F.eq(p1.x, p2.x) && F.eq(p1.y, p2.y);
 }
 
 
 template <typename BaseField>
-bool Curve<BaseField>::isZero(Point &p1) {
+bool Curve<BaseField>::isZero(const Point &p1) {
     return F.isZero(p1.zz);
 }
 
 template <typename BaseField>
-bool Curve<BaseField>::isZero(PointAffine &p1) {
+bool Curve<BaseField>::isZero(const PointAffine &p1) {
     return F.isZero(p1.x) && F.isZero(p1.y);
 }
 
 template <typename BaseField>
-void Curve<BaseField>::copy(Point &r, Point &a) {
+void Curve<BaseField>::copy(Point &r, const Point &a) {
     F.copy(r.x, a.x);
     F.copy(r.y, a.y);
     F.copy(r.zz, a.zz);
@@ -545,7 +545,7 @@ void Curve<BaseField>::copy(Point &r, Point &a) {
 }
 
 template <typename BaseField>
-void Curve<BaseField>::copy(Point &r, PointAffine &a) {
+void Curve<BaseField>::copy(Point &r, const PointAffine &a) {
     if (isZero(a)) {
         F.copy(r.x, F.one());
         F.copy(r.y, F.one());
@@ -560,7 +560,7 @@ void Curve<BaseField>::copy(Point &r, PointAffine &a) {
 }
 
 template <typename BaseField>
-void Curve<BaseField>::copy(PointAffine &r, Point &a) {
+void Curve<BaseField>::copy(PointAffine &r, const Point &a) {
 #ifdef COUNT_OPS
     cntToAffine++;
 #endif // COUNT_OPS
@@ -574,13 +574,13 @@ void Curve<BaseField>::copy(PointAffine &r, Point &a) {
 }
 
 template <typename BaseField>
-void Curve<BaseField>::copy(PointAffine &r, PointAffine &a) {
+void Curve<BaseField>::copy(PointAffine &r, const PointAffine &a) {
     F.copy(r.x, a.x);
     F.copy(r.y, a.y);
 }
 
 template <typename BaseField>
-void Curve<BaseField>::neg(Point &r, Point &a) {
+void Curve<BaseField>::neg(Point &r, const Point &a) {
     F.copy(r.x, a.x);
     F.neg(r.y, a.y);
     F.copy(r.zz, a.zz);
@@ -588,7 +588,7 @@ void Curve<BaseField>::neg(Point &r, Point &a) {
 }
 
 template <typename BaseField>
-void Curve<BaseField>::neg(Point &r, PointAffine &a) {
+void Curve<BaseField>::neg(Point &r, const PointAffine &a) {
     F.copy(r.x, a.x);
     F.neg(r.y, a.y);
     F.copy(r.zz, F.one());
@@ -596,7 +596,7 @@ void Curve<BaseField>::neg(Point &r, PointAffine &a) {
 }
 
 template <typename BaseField>
-void Curve<BaseField>::neg(PointAffine &r, Point &a) {
+void Curve<BaseField>::neg(PointAffine &r, const Point &a) {
 #ifdef COUNT_OPS
     cntToAffine++;
 #endif // COUNT_OPS
@@ -611,14 +611,14 @@ void Curve<BaseField>::neg(PointAffine &r, Point &a) {
 }
 
 template <typename BaseField>
-void Curve<BaseField>::neg(PointAffine &r, PointAffine &a) {
+void Curve<BaseField>::neg(PointAffine &r, const PointAffine &a) {
     F.copy(r.x, a.x);
     F.neg(r.y, a.y);
 }
 
 
 template <typename BaseField>
-std::string Curve<BaseField>::toString(Point &p, uint32_t radix) {
+std::string Curve<BaseField>::toString(const Point &p, uint32_t radix) {
     PointAffine tmp;
     copy(tmp, p);
     std::ostringstream stringStream;
@@ -627,7 +627,7 @@ std::string Curve<BaseField>::toString(Point &p, uint32_t radix) {
 }
 
 template <typename BaseField>
-std::string Curve<BaseField>::toString(PointAffine &p, uint32_t radix) {
+std::string Curve<BaseField>::toString(const PointAffine &p, uint32_t radix) {
     std::ostringstream stringStream;
     stringStream << "(" << F.toString(p.x, radix) << "," << F.toString(p.y, radix) << ")";
     return stringStream.str();
@@ -662,7 +662,7 @@ void Curve<BaseField>::printCounters() {
 #endif // COUNT_OPS
 
 template <typename BaseField>
-void Curve<BaseField>::multiAdd(PointAffine *p3, PointAffine *p1, PointAffine *p2, u_int64_t count) {
+void Curve<BaseField>::multiAdd(PointAffine *p3, const PointAffine *p1, const PointAffine *p2, u_int64_t count) {
 #ifdef COUNT_OPS
     cntAddAffine++;
 #endif // COUNT_OPS

@@ -8,7 +8,7 @@
 template <typename BaseField>
 class Curve {
 
-    void mulByA(typename BaseField::Element &r, typename BaseField::Element &ab);
+    void mulByA(typename BaseField::Element &r, const typename BaseField::Element &ab);
 public:
     struct Point {
         typename BaseField::Element x;
@@ -65,80 +65,80 @@ public:
     Curve(BaseField &aF, typename BaseField::Element &aa, typename BaseField::Element &ab, typename BaseField::Element &agx, typename BaseField::Element &agy);
     Curve(BaseField &aF, std::string as, std::string bs, std::string gxx, std::string gys);
 
-    typename BaseField::Element &a() {return fa; };
-    typename BaseField::Element &b() {return fb; };
-    Point &one() {return fone; };
-    PointAffine &oneAffine() {return foneAffine; };
-    Point &zero() {return fzero; };
-    PointAffine &zeroAffine() {return fzeroAffine; };
+    const typename BaseField::Element &a() {return fa; };
+    const typename BaseField::Element &b() {return fb; };
+    const Point &one() {return fone; };
+    const PointAffine &oneAffine() {return foneAffine; };
+    const Point &zero() {return fzero; };
+    const PointAffine &zeroAffine() {return fzeroAffine; };
 
-    void add(Point &p3, Point &p1, Point &p2);
-    void add(Point &p3, Point &p1, PointAffine &p2);
-    void add(Point &p3, PointAffine &p1, PointAffine &p2);
-    void add(Point &p3, PointAffine &p1, Point &p2) { add(p3, p2, p1); };
-    void multiAdd(PointAffine *p3, PointAffine *p1, PointAffine *p2, u_int64_t count);
+    void add(Point &p3, const Point &p1, const Point &p2);
+    void add(Point &p3, const Point &p1, const PointAffine &p2);
+    void add(Point &p3, const PointAffine &p1, const PointAffine &p2);
+    void add(Point &p3, const PointAffine &p1, const Point &p2) { add(p3, p2, p1); };
+    void multiAdd(PointAffine *p3, const PointAffine *p1, const PointAffine *p2, u_int64_t count);
     void multiAdd2(AddPointAffine *p, u_int64_t count);
 
-    void add(PointAffine &p3, Point &p1, Point &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
-    void add(PointAffine &p3, Point &p1, PointAffine &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
-    void add(PointAffine &p3, PointAffine &p1, PointAffine &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
-    void add(PointAffine &p3, PointAffine &p1, Point &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
+    void add(PointAffine &p3, const Point &p1, const Point &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
+    void add(PointAffine &p3, const Point &p1, const PointAffine &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
+    void add(PointAffine &p3, const PointAffine &p1, const PointAffine &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
+    void add(PointAffine &p3, const PointAffine &p1, const Point &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
 
-    void sub(Point &p3, Point &p1, Point &p2) { Point tmp; neg(tmp, p2); add(p3, p1, tmp); }
-    void sub(Point &p3, Point &p1, PointAffine &p2) { PointAffine tmp; neg(tmp, p2); add(p3, p1, tmp); }
-    void sub(Point &p3, PointAffine &p1, PointAffine &p2) { PointAffine tmp; neg(tmp, p2); add(p3, p1, tmp); }
-    void sub(Point &p3, PointAffine &p1, Point &p2) { Point tmp; neg(tmp, p2); add(p3, p1, tmp); }
-    void sub(PointAffine &p3, Point &p1, Point &p2) { Point tmp; neg(tmp, p2); add(p3, p1, tmp); }
-    void sub(PointAffine &p3, Point &p1, PointAffine &p2) { PointAffine tmp; neg(tmp, p2); add(p3, p1, tmp); };
-    void sub(PointAffine &p3, PointAffine &p1, PointAffine &p2) { PointAffine tmp; neg(tmp, p2); add(p3, p1, tmp); }
-    void sub(PointAffine &p3, PointAffine &p1, Point &p2) { Point tmp; neg(tmp, p2); add(p3, p1, tmp); }
+    void sub(Point &p3, const Point &p1, const Point &p2) { Point tmp; neg(tmp, p2); add(p3, p1, tmp); }
+    void sub(Point &p3, const Point &p1, const PointAffine &p2) { PointAffine tmp; neg(tmp, p2); add(p3, p1, tmp); }
+    void sub(Point &p3, const PointAffine &p1, const PointAffine &p2) { PointAffine tmp; neg(tmp, p2); add(p3, p1, tmp); }
+    void sub(Point &p3, const PointAffine &p1, const Point &p2) { Point tmp; neg(tmp, p2); add(p3, p1, tmp); }
+    void sub(PointAffine &p3, const Point &p1, const Point &p2) { Point tmp; neg(tmp, p2); add(p3, p1, tmp); }
+    void sub(PointAffine &p3, const Point &p1, const PointAffine &p2) { PointAffine tmp; neg(tmp, p2); add(p3, p1, tmp); };
+    void sub(PointAffine &p3, const PointAffine &p1, const PointAffine &p2) { PointAffine tmp; neg(tmp, p2); add(p3, p1, tmp); }
+    void sub(PointAffine &p3, const PointAffine &p1, const Point &p2) { Point tmp; neg(tmp, p2); add(p3, p1, tmp); }
 
-    void dbl(Point &r, Point &a);
-    void dbl(Point &r, PointAffine &a);
-    void dbl(PointAffine &r, Point &a) { Point tmp; dbl(tmp, a); copy(r, tmp); }
-    void dbl(PointAffine &r, PointAffine &a) { Point tmp; dbl(tmp, a); copy(r, tmp); }
+    void dbl(Point &r, const Point &a);
+    void dbl(Point &r, const PointAffine &a);
+    void dbl(PointAffine &r, const Point &a) { Point tmp; dbl(tmp, a); copy(r, tmp); }
+    void dbl(PointAffine &r, const PointAffine &a) { Point tmp; dbl(tmp, a); copy(r, tmp); }
 
 
-    void neg(Point &r, Point &a);
-    void neg(PointAffine &r, PointAffine &a);
-    void neg(Point &r, PointAffine &a);
-    void neg(PointAffine &r, Point &a);
+    void neg(Point &r, const Point &a);
+    void neg(PointAffine &r, const PointAffine &a);
+    void neg(Point &r, const PointAffine &a);
+    void neg(PointAffine &r, const Point &a);
 
-    bool eq(Point &p1, Point &p2);
-    bool eq(Point &p1, PointAffine &p2);
-    bool eq(PointAffine &p1, PointAffine &p2);
-    bool eq(PointAffine &p1, Point &p2) { return eq(p2, p1); }
+    bool eq(const Point &p1, const Point &p2);
+    bool eq(const Point &p1, const PointAffine &p2);
+    bool eq(const PointAffine &p1, const PointAffine &p2);
+    bool eq(const PointAffine &p1, const Point &p2) { return eq(p2, p1); }
 
-    bool isZero(Point &p1);
-    bool isZero(PointAffine &p1);
+    bool isZero(const Point &p1);
+    bool isZero(const PointAffine &p1);
 
-    std::string toString(Point &r, uint32_t radix = 10);
-    std::string toString(PointAffine &r, uint32_t radix = 10);
+    std::string toString(const Point &r, uint32_t radix = 10);
+    std::string toString(const PointAffine &r, uint32_t radix = 10);
 
-    void copy(Point &r, Point &a);
-    void copy(Point &r, PointAffine &a);
-    void copy(PointAffine &r, Point &a);
-    void copy(PointAffine &r, PointAffine &a);
+    void copy(Point &r, const Point &a);
+    void copy(Point &r, const PointAffine &a);
+    void copy(PointAffine &r, const Point &a);
+    void copy(PointAffine &r, const PointAffine &a);
 
-    void mulByScalar(Point &r, Point &base, uint8_t* scalar, unsigned int scalarSize) {
+    void mulByScalar(Point &r, const Point &base, const uint8_t *scalar, unsigned int scalarSize) {
         nafMulByScalar<Curve<BaseField>, Point, Point>(*this, r, base, scalar, scalarSize);
     }
 
-    void mulByScalar(Point &r, PointAffine &base, uint8_t* scalar, unsigned int scalarSize) {
+    void mulByScalar(Point &r, const PointAffine &base, const uint8_t *scalar, unsigned int scalarSize) {
         nafMulByScalar<Curve<BaseField>, PointAffine, Point>(*this, r, base, scalar, scalarSize);
     }
 
-    void multiMulByScalar(Point &r, PointAffine *bases, uint8_t* scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
+    void multiMulByScalar(Point &r, PointAffine *bases, uint8_t *scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
         ParallelMultiexp<Curve<BaseField>> pm(*this);
         pm.multiexp(r, bases, scalars, scalarSize, n);
     }
 
-    void multiMulByScalarMix(Point &r, PointAffine *bases, uint8_t* scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
+    void multiMulByScalarMix(Point &r, PointAffine *bases, uint8_t *scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
         ParallelMultiexpMix<Curve<BaseField>> pm(*this);
         pm.multiexp(r, bases, scalars, scalarSize, n);
     }
 
-    void multiMulByScalarBa(Point &r, PointAffine *bases, uint8_t* scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
+    void multiMulByScalarBa(Point &r, const PointAffine *bases, const uint8_t *scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
         ParallelMultiexpBa<Curve<BaseField>> pm(*this);
         pm.multiexp(r, bases, scalars, scalarSize, n);
     }

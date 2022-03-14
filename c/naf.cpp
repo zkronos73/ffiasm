@@ -52,7 +52,7 @@ bool buildNafTable() {
 
 
 
-void buildNaf(uint8_t *r, uint8_t* scalar, unsigned int scalarSize) {
+void buildNaf(uint8_t *r, const uint8_t* scalar, unsigned int scalarSize) {
     int64_t *r64 = (int64_t *)r;
 
     bool carry = false;
