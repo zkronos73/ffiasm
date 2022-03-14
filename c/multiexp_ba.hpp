@@ -10,26 +10,27 @@
 template <typename Curve>
 class ParallelMultiexpBa
 {
-    typename Curve::PointAffine *bases;
-    uint8_t* scalars;
+    const typename Curve::PointAffine *bases;
+    typedef BatchAccumulators<Curve> BatchAcc;
+
+    const uint8_t* scalars;
     uint32_t scalarSize;
     uint32_t n;
     uint32_t bitsPerChunk;
     uint64_t accsPerChunk;
     uint32_t nChunks;
     Curve &g;
-    BatchAccumulators<Curve> batchAcc;
 
     int64_t resultRef;
     int64_t chunkResultRef;
 
     uint32_t getChunk ( uint32_t scalarIdx, uint32_t chunkIdx );
-    void processChunks ( void );
-    void reduce ( void );
+    void processChunks ( BatchAcc &ba, uint32_t idChunk );
+    void reduce ( BatchAcc &ba, uint32_t idChunk);
 
 public:
-    ParallelMultiexpBa(Curve &_g): g(_g), batchAcc(_g) {}
-    void multiexp(typename Curve::Point &r, typename Curve::PointAffine *_bases, uint8_t* _scalars, uint32_t _scalarSize, uint32_t _n, uint32_t _nThreads=0);
+    ParallelMultiexpBa(Curve &_g): g(_g) {}
+    void multiexp(typename Curve::Point &r, const typename Curve::PointAffine *_bases, const uint8_t* _scalars, uint32_t _scalarSize, uint32_t _n, uint32_t _nThreads=0);
 };
 
 #include "multiexp_ba.cpp"

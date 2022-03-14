@@ -111,8 +111,7 @@ void BatchAccumulators<Curve>::freeValues (void)
 template <typename Curve>
 void BatchAccumulators<Curve>::dbl ( int64_t accumulatorId )
 {
-    auto value = getValue(accumulatorId);
-    addPoint(accumulatorId, value, false);    
+    addPoint(accumulatorId, getValue(accumulatorId), false);    
 }
 
 template <typename Curve>
@@ -124,7 +123,7 @@ void BatchAccumulators<Curve>::add ( int64_t accumulatorId, int64_t valueAccumul
 }
 
 template <typename Curve>
-void BatchAccumulators<Curve>::addPoint ( int64_t accumulatorId, typename Curve::PointAffine &value )
+void BatchAccumulators<Curve>::addPoint ( int64_t accumulatorId, const typename Curve::PointAffine &value )
 {
     internalAdd(accumulatorId, value, false);
 }
@@ -135,6 +134,7 @@ int64_t BatchAccumulators<Curve>::incValuesCount ( void )
     // printf("incValuesCount(valuesCount:%ld)\n", valuesCount);
     ++valuesCount;    
     if (valuesCount >= valuesSize) {
+        printf("RESIZE!!!\n");
         resize();
     }
 
@@ -145,7 +145,7 @@ int64_t BatchAccumulators<Curve>::incValuesCount ( void )
 }
 
 template <typename Curve>
-void BatchAccumulators<Curve>::internalAdd ( int64_t accumulatorId, typename Curve::PointAffine &value, bool internal )
+void BatchAccumulators<Curve>::internalAdd ( int64_t accumulatorId, const typename Curve::PointAffine &value, bool internal )
 {
     // assert(accumulatorId >= 0 && accumulatorId < accumulatorsCount);
     if (IS_ZERO(value)) {
@@ -213,20 +213,8 @@ void BatchAccumulators<Curve>::internalAdd ( int64_t accumulatorId, typename Cur
     #endif
 }
 
-
 template <typename Curve>
-void BatchAccumulators<Curve>::prepareSingleValues ( void )
-{
-    // #pragma omp parallel for
-/*    for (int64_t index = 0; index < accumulatorsCount; ++index) {
-        if (accumulators[index].index < 0) continue;
-        // assert(accumulators[index].index >= 0 && accumulators[index].index < valuesSize);
-        ZERO(rightValues[accumulators[index].index]);
-    }*/
-}
-
-template <typename Curve>
-typename Curve::PointAffine BatchAccumulators<Curve>::getValue ( int64_t accumulatorId )
+const typename Curve::PointAffine &BatchAccumulators<Curve>::getValue ( int64_t accumulatorId )
 {
     // assert(accumulatorId >= 0 && accumulatorId < accumulatorsCount);
     // assert(accumulators[accumulatorId].ready);
@@ -249,27 +237,13 @@ void BatchAccumulators<Curve>::resize ( void )
 template <typename Curve>
 bool BatchAccumulators<Curve>::calculateOnlyOneLoop ( void )
 {
-    // printf("calculateOnlyOneLoop valuesCount:%ld\n", valuesCount);
     if (!valuesCount) {
         return true;
     }
-    // prepareSingleValues();
 
     ++currentLoop;
     multiAdd();
 
-/*    for (int64_t index = 0; index < valuesCount; ++index ) {
-        int64_t accumulatorId = accumulatorIds[index];
-        Accumulator &accumulator = accumulators[accumulatorId];
-
-        if (accumulator.count > 1) continue;
-        
-        COPY(accumulator.value, resultValues[index]);
-        accumulator.ready = true;
-    }
-
-    prepareAccumulatorsToNextRound();
-*/    
     int64_t oldValuesCount = valuesCount;
     valuesCount = 0;
 
@@ -332,15 +306,6 @@ void BatchAccumulators<Curve>::multiAdd ( void )
         int offset = block * valuesBlock;
         g.multiAdd(resultValues + offset, leftValues + offset, rightValues + offset, count);
     }
-}
-
-template <typename Curve>
-void BatchAccumulators<Curve>::prepareAccumulatorsToNextRound ( void )
-{
-    // #pragma omp parallel for
-/*    for (int64_t index = 0; index < accumulatorsCount; ++index ) {
-        accumulators[index].count = 0;
-    }*/
 }
 
 template <typename Curve>

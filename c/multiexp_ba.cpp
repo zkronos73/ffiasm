@@ -27,25 +27,22 @@ uint32_t ParallelMultiexpBa<Curve>::getChunk(uint32_t scalarIdx, uint32_t chunkI
 }
 
 template <typename Curve>
-void ParallelMultiexpBa<Curve>::processChunks ( void ) 
+void ParallelMultiexpBa<Curve>::processChunks ( BatchAcc &ba, uint32_t idChunk ) 
 {
     uint32_t chunkValue;
     int64_t offset;
     
     // #pragma omp parallel for
-    for (uint32_t idChunk = 0; idChunk < nChunks; ++idChunk) {
-        offset = idChunk * accsPerChunk;
-        for(uint32_t i=0; i<n; i++) {
-            if (g.isZero(bases[i])) continue;
-            if ((chunkValue = getChunk(i, idChunk))) {
-                batchAcc.addPoint(offset + chunkValue, bases[i]);
-            }
+    for(uint32_t i=0; i<n; i++) {
+        if (g.isZero(bases[i])) continue;
+        if ((chunkValue = getChunk(i, idChunk))) {
+            ba.addPoint(chunkValue, bases[i]);
         }
     }
 }
 
 template <typename Curve>
-void ParallelMultiexpBa<Curve>::reduce ( void ) 
+void ParallelMultiexpBa<Curve>::reduce ( BatchAcc &ba, uint32_t idChunk ) 
 {
     uint32_t p2ref, ndiv2, ndiv2abs, chunkOffset;
     uint32_t nBits = bitsPerChunk;
@@ -55,22 +52,17 @@ void ParallelMultiexpBa<Curve>::reduce ( void )
     
     while (nBits > 0) {
         ndiv2 = 1 << (nBits-1);
-        for (uint32_t idChunk = 0; idChunk < nChunks; idChunk++) {
-            chunkOffset = idChunk * accsPerChunk;
-            ndiv2abs = chunkOffset + ndiv2;
 
-            for (uint32_t i = 1; i< ndiv2; i++) {
-                uint32_t index = chunkOffset + i;
+        for (uint32_t i = 1; i< ndiv2; i++) {
 
-                if (batchAcc.isZero(index + ndiv2)) continue;
-                batchAcc.add(index, index + ndiv2);
-                batchAcc.add(ndiv2abs, index + ndiv2);
-            }
+            if (ba.isZero(i + ndiv2)) continue;
+            ba.add(i, i + ndiv2);
+            ba.add(ndiv2, i + ndiv2);
         }
-        batchAcc.calculateOnlyOneLoop();        
+        ba.calculateOnlyOneLoop();        
         --nBits;
     }
-    batchAcc.calculate();        
+    ba.calculate();        
 //    batchAcc.dumpStats();
 //    printf("== (%s:%d) == cntToAffine: %d\n", __FILE__, __LINE__,g.cntToAffine);
 
@@ -78,37 +70,30 @@ void ParallelMultiexpBa<Curve>::reduce ( void )
     while (nBits > 0) {
         ndiv2 = 1 << (nBits-1);
         for (int i = 0; i < (nBits-1); ++i) {
-            for (uint32_t idChunk = 0; idChunk < nChunks; idChunk++) {
-                ndiv2abs = idChunk * accsPerChunk + ndiv2;
-                batchAcc.add(ndiv2abs, ndiv2abs);            
-            }
-            batchAcc.calculate();
+            ba.add(ndiv2, ndiv2);            
+            ba.calculate();
         }
-        for (uint32_t idChunk = 0; idChunk < nChunks; idChunk++) {
-            ndiv2abs = idChunk * accsPerChunk + ndiv2;
-            if (nBits == 1) {
-                chunkOffset = idChunk * accsPerChunk;
-                batchAcc.add(chunkResultRef + idChunk, chunkOffset + 1);
-                continue;
-            }
+        if (nBits == 1) {
+            ba.add(chunkResultRef, 1);
+            break;
+        }
            
-            batchAcc.add(chunkResultRef + idChunk, ndiv2abs);
-        }
+        ba.add(chunkResultRef, ndiv2);
         --nBits;
     }
-    batchAcc.calculate();
+    ba.calculate();
 //    batchAcc.dumpStats();
 //    printf("== (%s:%d) == cntToAffine: %d\n", __FILE__, __LINE__,g.cntToAffine);
 }
 
 template <typename Curve>
-void ParallelMultiexpBa<Curve>::multiexp(typename Curve::Point &r, typename Curve::PointAffine *_bases, uint8_t* _scalars, uint32_t _scalarSize, uint32_t _n, uint32_t _nThreads) 
+void ParallelMultiexpBa<Curve>::multiexp(typename Curve::Point &r, const typename Curve::PointAffine *_bases, const uint8_t* _scalars, uint32_t _scalarSize, uint32_t _n, uint32_t _nThreads) 
 {
 //     nThreads = _nThreads==0 ? omp_get_max_threads() : _nThreads;
 // batchAcc.dumpStats();
 //    printf("== (%s:%d) == cntToAffine: %d\n", __FILE__, __LINE__,g.cntToAffine);
     uint64_t t1, t2, t3, t4, t5, t6, t7;
-    t1 = getRealTimeClockUs();
+    // t1 = getRealTimeClockUs();
     bases = _bases;
     scalars = _scalars;
     scalarSize = _scalarSize;
@@ -131,33 +116,37 @@ void ParallelMultiexpBa<Curve>::multiexp(typename Curve::Point &r, typename Curv
     nChunks = ((scalarSize*8 - 1 ) / bitsPerChunk)+1;
     accsPerChunk = 1 << bitsPerChunk;  // In the chunks last bit is always zero.
 
-    batchAcc.defineAccumulators(nChunks * accsPerChunk);
+
+    // t2 = getRealTimeClockUs();
+
+    typename Curve::PointAffine chunkResults[nChunks];
+
+    #pragma omp parallel for
+    for (uint32_t idChunk = 0; idChunk < nChunks; ++idChunk) {
+        BatchAccumulators<Curve> ba(g);
+        ba.defineAccumulators(accsPerChunk);
+        chunkResultRef = ba.defineAccumulators(1);
+        ba.setup(n >> 1, n >> 4);
+
+        processChunks(ba, idChunk);
+        // t3 = getRealTimeClockUs();
+        ba.calculate();
+        // t4 = getRealTimeClockUs();
+        reduce(ba, idChunk);
+        // t5 = getRealTimeClockUs();
+        ba.calculate();
+        // t6 = getRealTimeClockUs();
+        g.copy(chunkResults[idChunk], ba.getValue(chunkResultRef));
+        // ba.dumpStats();
+    }
     
-    chunkResultRef = batchAcc.defineAccumulators(nChunks);
-    resultRef= batchAcc.defineAccumulators(1);
-//    batchAcc.defineAccumulators(1000);
-
-    batchAcc.setup(10 * n, n);
-    t2 = getRealTimeClockUs();
-    processChunks();
-    t3 = getRealTimeClockUs();
-    batchAcc.calculate();
-    t4 = getRealTimeClockUs();
-    reduce();
-    t5 = getRealTimeClockUs();
-    batchAcc.calculate();
-    t6 = getRealTimeClockUs();
-
-    typename Curve::PointAffine value;
-    value = batchAcc.getValue(chunkResultRef + nChunks - 1);
-    g.copy(r, value);
+    g.copy(r, chunkResults[nChunks-1]);
     for  (int j=nChunks-2; j>=0; j--) {
         for (uint32_t k=0; k<bitsPerChunk; k++) g.dbl(r, r);
-        value = batchAcc.getValue(chunkResultRef + j);
-        g.add(r, r, value);
+        g.add(r, r, chunkResults[j]);
     }
-    t7 = getRealTimeClockUs();
-    printf("setup:%'ld processChunks:%'ld calculate:%'ld reduce:%'ld calculate:%'ld final:%'ld\n",
-        t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6);
+    // t7 = getRealTimeClockUs();
+    // printf("setup:%'ld processChunks:%'ld calculate:%'ld reduce:%'ld calculate:%'ld final:%'ld\n",
+    //    t2-t1, t3-t2, t4-t3, t5-t4, t6-t5, t7-t6);
     // batchAcc.dumpStats();
 }

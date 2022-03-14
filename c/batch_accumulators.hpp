@@ -19,7 +19,7 @@ class BatchAccumulators
         void setup(int64_t _initialValues, int64_t _deltaValues);
 
         // TODO: value as const, but need modify Curve::copy
-        void addPoint(int64_t accumulatorId, typename Curve::PointAffine &value);
+        void addPoint(int64_t accumulatorId, const typename Curve::PointAffine &value);
         void add(int64_t accumulatorId, int64_t valueAccumulatorId);
         void dbl(int64_t accumulatorId );
         bool calculateOnlyOneLoop ( void );
@@ -27,7 +27,7 @@ class BatchAccumulators
         void clear ( void );
         bool ready ( void );
         typename Curve::PointAffine isValueReady ( int64_t accumulatorId );
-        typename Curve::PointAffine getValue ( int64_t accumulatorId );
+        const typename Curve::PointAffine &getValue ( int64_t accumulatorId );
         bool isZero ( int64_t accumulatorId );
         int64_t defineAccumulators ( int64_t count );
         void dumpStats ( void );
@@ -58,10 +58,8 @@ class BatchAccumulators
         typename Curve::PointAffine zero;
 
         void freeValues ( void );
-        void prepareSingleValues ( void );
-        void prepareAccumulatorsToNextRound ( void );
         void resize ( void );
-        void internalAdd ( int64_t accumulatorId, typename Curve::PointAffine &value, bool internal );
+        void internalAdd ( int64_t accumulatorId, const typename Curve::PointAffine &value, bool internal );
         void multiAdd ( void );
         int64_t incValuesCount ( void );
 };
