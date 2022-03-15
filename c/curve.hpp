@@ -109,8 +109,8 @@ public:
     bool eq(const PointAffine &p1, const PointAffine &p2);
     bool eq(const PointAffine &p1, const Point &p2) { return eq(p2, p1); }
 
-    bool isZero(const Point &p1);
-    bool isZero(const PointAffine &p1);
+    inline bool isZero(const Point &p1);
+    inline bool isZero(const PointAffine &p1);
 
     std::string toString(const Point &r, uint32_t radix = 10);
     std::string toString(const PointAffine &r, uint32_t radix = 10);

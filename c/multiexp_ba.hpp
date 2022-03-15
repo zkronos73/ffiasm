@@ -13,6 +13,13 @@ class ParallelMultiexpBa
     const typename Curve::PointAffine *bases;
     typedef BatchAccumulators<Curve> BatchAcc;
 
+    typedef struct {
+        uint32_t byteStart;
+        uint32_t shift;
+        uint64_t mask;
+    } ChunkInfo;
+
+    ChunkInfo *chunkInfo;
     const uint8_t* scalars;
     uint32_t scalarSize;
     uint32_t n;
@@ -24,7 +31,9 @@ class ParallelMultiexpBa
     int64_t resultRef;
     int64_t chunkResultRef;
 
-    uint32_t getChunk ( uint32_t scalarIdx, uint32_t chunkIdx );
+    inline uint32_t getChunk ( uint32_t scalarIdx, uint32_t chunkIdx );
+    inline uint32_t fastGetChunk ( uint32_t scalarIdx, uint32_t idChunk );
+    void prepareGetChunk ( void );
     void processChunks ( BatchAcc &ba, uint32_t idChunk );
     void reduce ( BatchAcc &ba, uint32_t idChunk);
 

@@ -132,16 +132,20 @@ template <typename Curve>
 int64_t BatchAccumulators<Curve>::incValuesCount ( void )
 {
     // printf("incValuesCount(valuesCount:%ld)\n", valuesCount);
-    ++valuesCount;    
-    if (valuesCount >= valuesSize) {
-        printf("RESIZE!!!\n");
-        resize();
+    int64_t result;
+    // #pragma omp critical
+    {
+        result = valuesCount;
+        ++valuesCount;    
+        if (valuesCount >= valuesSize) {
+            ++stats.resizes;
+            resize();
+        }
     }
-
-    if (valuesCount > maxValues) {
-        maxValues = valuesCount;
+    if (valuesCount > stats.maxValues) {
+        stats.maxValues = valuesCount;
     }
-    return valuesCount - 1;
+    return result;
 }
 
 template <typename Curve>
@@ -280,21 +284,41 @@ bool BatchAccumulators<Curve>::calculateOnlyOneLoop ( void )
 template <typename Curve>
 void BatchAccumulators<Curve>::multiAdd ( void )
 {
-    #ifdef BATCH_ACCUMULATORS_STATS
-    ++multiAddOperations;
-    totalMultiAddValues += valuesCount;
-    if (maxMultiAddValues < valuesCount) {
-        maxMultiAddValues = valuesCount;
+    const int maxBlockSize = 16*1024;
+    const int minBlockSize = 64;
+    int valuesBlock = valuesCount;
+    if (valuesCount > minBlockSize) {
+        // valuesBlock = valuesCount / omp_get_max_threads();
+        valuesBlock = valuesCount / 32;
+        if (valuesBlock < minBlockSize) valuesBlock = minBlockSize;
+        if (valuesBlock > maxBlockSize) valuesBlock = maxBlockSize;
     }
-    if (minMultiAddValues < 0 || minMultiAddValues > valuesCount) {
-        minMultiAddValues = valuesCount;
-    }
-    #endif
 
-    int valuesBlock = valuesCount > 32 ? valuesCount >> 3 : valuesCount;
     int nBlocks = valuesCount / valuesBlock;
     int valuesLastBlock = valuesCount - (nBlocks - 1) * valuesBlock;
-    
+
+    #ifdef BATCH_ACCUMULATORS_STATS
+    ++stats.multiAddOperations;
+    stats.totalMultiAddValues += valuesCount;
+    if (stats.maxMultiAddValues < valuesCount) {
+        stats.maxMultiAddValues = valuesCount;
+    }
+    if (stats.minMultiAddValues < 0 || stats.minMultiAddValues > valuesCount) {
+        stats.minMultiAddValues = valuesCount;
+    }
+    if (valuesCount == 1) {
+        ++stats.singleMultiAdds;
+    }
+    if (valuesCount <= 8) {
+        ++stats.shortMultiAdds;
+    }
+    if (stats.maxBlock < valuesBlock) {
+        stats.maxBlock = valuesBlock;
+    }
+    if (stats.minBlock < 0 || stats.minBlock > valuesBlock) {
+        stats.minBlock = valuesBlock;
+    }
+    #endif
 //    dumpStats();
 //    printf("== (%s:%d) == cntToAffine: %d\n", __FILE__, __LINE__,g.cntToAffine);
 
@@ -311,20 +335,19 @@ void BatchAccumulators<Curve>::multiAdd ( void )
 template <typename Curve>
 void BatchAccumulators<Curve>::dumpStats ( void )
 {
-    printf("maxValues:%'ld\n",maxValues);
-    printf("multiAddOperations:%'ld\n",multiAddOperations);
-    printf("maxMultiAddValues:%'ld\n",maxMultiAddValues);
-    printf("minMultiAddValues:%'ld\n",minMultiAddValues);
-    printf("totalMultiAddValues:%'ld\n",totalMultiAddValues);
-    printf("avgMultiAddValues:%'.02f\n",(double)totalMultiAddValues/(double)multiAddOperations);
+    printf("maxValues:%'ld\n",stats.maxValues);
+    printf("multiAddOperations:%'ld\n",stats.multiAddOperations);
+    printf("maxMultiAddValues:%'ld\n",stats.maxMultiAddValues);
+    printf("minMultiAddValues:%'ld\n",stats.minMultiAddValues);
+    printf("totalMultiAddValues:%'ld\n",stats.totalMultiAddValues);
+    printf("avgMultiAddValues:%'.02f\n",(double)stats.totalMultiAddValues/(double)stats.multiAddOperations);
+    printf("resizes:%'d\n",stats.resizes);
 }
 
 template <typename Curve>
 void BatchAccumulators<Curve>::clearStats ( void )
 {
-    maxValues=0;
-    multiAddOperations=0;
-    maxMultiAddValues=0;
-    minMultiAddValues=-1;
-    totalMultiAddValues=0;
+    memset(&stats, 0, sizeof(stats));
+    stats.minMultiAddValues = -1;
+    stats.minBlock = -1;
 }

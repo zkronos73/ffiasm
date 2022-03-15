@@ -4,15 +4,25 @@
 
 #define BATCH_ACCUMULATORS_STATS 
 
+typedef struct {
+    int64_t maxValues;
+    int64_t singleMultiAdds;
+    int64_t shortMultiAdds;
+    int64_t minBlock;
+    int64_t maxBlock;
+    int64_t multiAddOperations;
+    int64_t maxMultiAddValues;
+    int64_t minMultiAddValues;
+    int64_t totalMultiAddValues;
+    int32_t resizes;
+} BatchAccumulatorsStats;
+
 template <typename Curve>
 class BatchAccumulators
 {
     public:
-        int64_t maxValues;
-        int64_t multiAddOperations;
-        int64_t maxMultiAddValues;
-        int64_t minMultiAddValues;
-        int64_t totalMultiAddValues;
+
+        BatchAccumulatorsStats stats;
 
         Curve &g;
         BatchAccumulators(Curve &_g);
