@@ -2,7 +2,7 @@
 #define __FFIASM__BATCH_ACCUMULATORS__H__
 
 
-#define BATCH_ACCUMULATORS_STATS 
+// #define BATCH_ACCUMULATORS_STATS 
 
 typedef struct {
     int64_t maxValues;
@@ -25,13 +25,14 @@ class BatchAccumulators
         BatchAccumulatorsStats stats;
 
         Curve &g;
-        BatchAccumulators(Curve &_g);
-        void setup(int64_t _initialValues, int64_t _deltaValues);
+        BatchAccumulators ( Curve &_g );
+        ~BatchAccumulators ( void );
+        void setup ( int64_t _initialValues, int64_t _deltaValues );
 
         // TODO: value as const, but need modify Curve::copy
-        void addPoint(int64_t accumulatorId, const typename Curve::PointAffine &value);
-        void add(int64_t accumulatorId, int64_t valueAccumulatorId);
-        void dbl(int64_t accumulatorId );
+        inline void addPoint(int64_t accumulatorId, const typename Curve::PointAffine &value );
+        inline void add(int64_t accumulatorId, int64_t valueAccumulatorId );
+        void dbl ( int64_t accumulatorId );
         bool calculateOnlyOneLoop ( void );
         void calculate( void ) { while (!calculateOnlyOneLoop()); }
         void clear ( void );
@@ -42,6 +43,10 @@ class BatchAccumulators
         int64_t defineAccumulators ( int64_t count );
         void dumpStats ( void );
         void clearStats ( void );
+        void prepareToJoin ( uint64_t offset = 0);
+        void join ( BatchAccumulators *aux, uint64_t offset = 0);
+        uint64_t getValuesCount ( void ) { return valuesCount; };
+        uint64_t getValuesSize ( void ) { return valuesSize; };
 
     protected:
 
@@ -69,9 +74,10 @@ class BatchAccumulators
 
         void freeValues ( void );
         void resize ( void );
-        void internalAdd ( int64_t accumulatorId, const typename Curve::PointAffine &value, bool internal );
+        bool nonInternalAddBlock ( int64_t accumulatorId, const typename Curve::PointAffine &value );
+        void internalAddBlock ( int64_t accumulatorId, const typename Curve::PointAffine &value );
         void multiAdd ( void );
-        int64_t incValuesCount ( void );
+        inline int64_t incValuesCount ( void );
 };
 
 #include "batch_accumulators.cpp"

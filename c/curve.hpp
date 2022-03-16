@@ -2,7 +2,6 @@
 
 #include "exp.hpp"
 #include "multiexp.hpp"
-#include "multiexp_mix.hpp"
 #include "multiexp_ba.hpp"
 
 template <typename BaseField>
@@ -22,13 +21,6 @@ public:
         typename BaseField::Element y;
     };
 
-    struct AddPointAffine {
-        PointAffine left;
-        PointAffine right;
-        PointAffine result;
-        // typename BaseField::BatchInverseData inverse;
-        // bool eqs;
-    };
 private: 
 
     void initCurve(typename BaseField::Element &aa, typename BaseField::Element &ab, typename BaseField::Element &agx, typename BaseField::Element &agy);
@@ -77,7 +69,6 @@ public:
     void add(Point &p3, const PointAffine &p1, const PointAffine &p2);
     void add(Point &p3, const PointAffine &p1, const Point &p2) { add(p3, p2, p1); };
     void multiAdd(PointAffine *p3, const PointAffine *p1, const PointAffine *p2, u_int64_t count);
-    void multiAdd2(AddPointAffine *p, u_int64_t count);
 
     void add(PointAffine &p3, const Point &p1, const Point &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
     void add(PointAffine &p3, const Point &p1, const PointAffine &p2) { Point tmp; add(tmp, p1, p2); copy(p3, tmp); };
@@ -130,11 +121,6 @@ public:
 
     void multiMulByScalar(Point &r, PointAffine *bases, uint8_t *scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
         ParallelMultiexp<Curve<BaseField>> pm(*this);
-        pm.multiexp(r, bases, scalars, scalarSize, n);
-    }
-
-    void multiMulByScalarMix(Point &r, PointAffine *bases, uint8_t *scalars, unsigned int scalarSize, unsigned int n, unsigned int nThreads=0) {
-        ParallelMultiexpMix<Curve<BaseField>> pm(*this);
         pm.multiexp(r, bases, scalars, scalarSize, n);
     }
 

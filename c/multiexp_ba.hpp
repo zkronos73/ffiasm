@@ -1,9 +1,9 @@
 #ifndef PAR_MULTIEXP2_BA
 #define PAR_MULTIEXP2_BA
 
-#define PME2_PACK_FACTOR 2
-#define PME2_MAX_CHUNK_SIZE_BITS 16
-#define PME2_MIN_CHUNK_SIZE_BITS 2
+#define PME2_PACK_BA_FACTOR 2
+#define PME2_MAX_CHUNK_BA_SIZE_BITS 14
+#define PME2_MIN_CHUNK_BA_SIZE_BITS 2
 
 #include "batch_accumulators.hpp"
 
@@ -36,9 +36,11 @@ class ParallelMultiexpBa
     void prepareGetChunk ( void );
     void processChunks ( BatchAcc &ba, uint32_t idChunk );
     void reduce ( BatchAcc &ba, uint32_t idChunk);
+    void freeChunkInfo ( void );
 
 public:
-    ParallelMultiexpBa(Curve &_g): g(_g) {}
+    ParallelMultiexpBa ( Curve &_g );
+    ~ParallelMultiexpBa ( void );
     void multiexp(typename Curve::Point &r, const typename Curve::PointAffine *_bases, const uint8_t* _scalars, uint32_t _scalarSize, uint32_t _n, uint32_t _nThreads=0);
 };
 

@@ -1,7 +1,3 @@
-#ifndef COUNT_OPS
-#define COUNT_OPS
-#endif
-
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
