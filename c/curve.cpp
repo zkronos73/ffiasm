@@ -700,7 +700,7 @@ void Curve<BaseField>::multiAdd(PointAffine *p3, const PointAffine *p1, const Po
     }
 
     auto lambdaCount = lambdaIndex;
-    F.batchInverse(lambdas, lambdas, lambdaCount);
+    F.batchInverse_2(lambdas, lambdas, lambdaCount);
     lambdaIndex = 0;
     for (auto index = 0; index < count; ++index) {
         /* __builtin_prefetch(p1 + index + 8, 0);

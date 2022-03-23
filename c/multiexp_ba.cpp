@@ -84,7 +84,7 @@ void ParallelMultiexpBa<Curve>::processChunks ( BatchAcc &ba, uint32_t idChunk )
     uint32_t accsPerChunkBlock = accsPerChunk / chunkBlocks;
     BatchAccumulators<Curve> *cbba[chunkBlocks < 1 ? 1: chunkBlocks]; // chunkBlocks];
 
-    #pragma omp parallel for
+//    #pragma omp parallel for
     for (uint32_t j=0; j < chunkBlocks; ++j) {
         uint32_t shift = bitsPerChunk - chunkBlockBits;
         uint32_t accumulatorSize = ba.getValuesSize() / (chunkBlocks > 4 ? chunkBlocks/2 : 1);
@@ -221,6 +221,7 @@ void ParallelMultiexpBa<Curve>::multiexp(typename Curve::Point &r, const typenam
     uint64_t t0,t1,t2;
     uint64_t t[5][nChunks];
     BatchAccumulatorsStats stats[2][nChunks];
+    #warning FULL STATS ACTIVE !!
 #endif
 
     __TIME_MARK(t0);

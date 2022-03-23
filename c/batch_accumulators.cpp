@@ -277,7 +277,7 @@ void BatchAccumulators<Curve>::multiAdd ( void )
     int valuesBlock = valuesCount;
     if (valuesCount > minBlockSize) {
 //         valuesBlock = valuesCount / omp_get_max_threads();
-        valuesBlock = valuesCount / 32;
+        valuesBlock = valuesCount / 8;
         if (valuesBlock < minBlockSize) valuesBlock = minBlockSize;
         if (valuesBlock > maxBlockSize) valuesBlock = maxBlockSize;
     }
@@ -286,6 +286,8 @@ void BatchAccumulators<Curve>::multiAdd ( void )
     int valuesLastBlock = valuesCount - (nBlocks - 1) * valuesBlock;
 
     #ifdef BATCH_ACCUMULATORS_STATS
+    #warning BATCH_ACCUMULATORS_STATS ACTIVE !!
+
     ++stats.multiAddOperations;
     stats.totalMultiAddValues += valuesCount;
     if (stats.maxMultiAddValues < valuesCount) {
@@ -307,6 +309,7 @@ void BatchAccumulators<Curve>::multiAdd ( void )
         stats.minBlock = valuesBlock;
     }
     #endif
+//    g.multiAdd(resultValues, leftValues, rightValues, valuesCount);
     
     #pragma omp parallel for
     for (int block = 0; block < nBlocks; ++ block) {

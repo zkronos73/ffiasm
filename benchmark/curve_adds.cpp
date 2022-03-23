@@ -36,10 +36,13 @@ class CurveAdds {
         int64_t offsetBases;
         std::string outputFile;
         bool flgMultiSums;
+        bool flgParallelMultiSums;
         bool flgSums;
+        bool flgBases;
         bool flgVerifySums;
         bool flgBasesLoad;
         bool flgBasesSave;
+        bool flgInverses;
         bool flgSetN;
         int times;
         std::string basesFile;
@@ -55,9 +58,13 @@ class CurveAdds {
         void generateBases ( void );
         void freeBases ( void );
         void freeSums ( void );
+        int64_t getRealTimeClockUs ( void );
         void freeMultiSums ( void );
         void calculateMultiSums ( void );
+        void calculateParallelMultiSums ( void );
         void calculateSums ( void );
+        void calculateBaseOperations ( void );
+        void calculateInverses ( void );
         void verifySums ( void );
         void parseArguments ( int argc, char **argv );
         void loadBases ( void );
@@ -73,7 +80,10 @@ CurveAdds::CurveAdds ( void )
     times = 1;
     flgSums = false;
     flgMultiSums = false;
+    flgParallelMultiSums = false;
     flgVerifySums = false;
+    flgBases = false;
+    flgInverses = false;
     affineBases = NULL;
     bases = NULL;
     sums = NULL;
@@ -102,7 +112,7 @@ void CurveAdds::parseArguments ( int argc, char **argv )
 {
     int opt;
 
-    while ((opt = getopt(argc, argv, "n:t:o:mavhs:l:")) != -1) {
+    while ((opt = getopt(argc, argv, "n:t:o:mbavihsp:l:")) != -1) {
         switch (opt) {
             case 'n':
                 n = atoi(optarg);
@@ -119,6 +129,18 @@ void CurveAdds::parseArguments ( int argc, char **argv )
 
             case 'm':
                 flgMultiSums = true;
+                break;
+
+            case 'p':
+                flgParallelMultiSums = true;
+                break;
+
+            case 'i':
+                flgInverses = true;
+                break;
+
+            case 'b':
+                flgBases = true;
                 break;
 
             case 'a':
@@ -327,6 +349,108 @@ void CurveAdds::loadBases()
     printf("Loaded %'ld bases (affine + non-affine) from %s\n", nBases, basesFile.c_str());
 }
 
+/*
+void CurveAdds::calculateInverses ( void )
+{
+    clock_t start, end;
+
+    F1Element *values = new F1Element[n];
+    F1Element *results = new F1Element[n];
+    F1Element *results2 = new F1Element[n];
+    if (!values || !results) {
+        printf("ERROR allocating memory for %'ld F1Elements (values %p, results %p)\n", n, values, results);
+        exit(EXIT_FAILURE);
+    }
+    printf("\nPreparing %'ld values ....\n", n);
+    for (int i = 0; i < n; ++i) {
+        values[i] = affineBases[i].x;
+    }
+    G1.F.batchInverse(results, values, n);
+    printf("\nStarting %'ld batchInverse I ....\n", n);
+    start = clock();
+    G1.F.batchInverse(results, values, n);
+    end = clock();
+    multiSumsSeconds += ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("Seconds used on %'ld batchInverse I: %.2lf\n", n, multiSumsSeconds);
+
+    G1.F.batchInverse_2(results2, values, n);
+    printf("\nStarting %'ld batchInverse II ....\n", n);
+    start = clock();
+    G1.F.batchInverse_2(results2, values, n);
+    end = clock();
+    multiSumsSeconds += ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("Seconds used on %'ld batchInverse II: %.2lf\n", n, multiSumsSeconds);
+    int cnt = 0;
+    for (int i = 0; i < n; ++i) {
+        if (!G1.F.eq(results[i], results2[i])) {
+            ++cnt;
+        }
+    }
+    printf("%d differents values\n", cnt);
+}
+*/
+
+void CurveAdds::calculateInverses ( void )
+{
+    clock_t start, end;
+
+    typedef struct {
+        F1Element value;
+        F1Element result;
+    } TwoF1Elements;
+
+    int loops = 1; // 500000;
+    int loopSize = n / loops;
+    TwoF1Elements *elements = new TwoF1Elements[n];
+    F1Element *results = new F1Element[n];
+    F1Element *values = new F1Element[n];
+    // F1Element *results2 = new F1Element[n];
+    if (!values || !results) {
+        printf("ERROR allocating memory for %'ld F1Elements (values %p, results %p)\n", n, values, results);
+        exit(EXIT_FAILURE);
+    }
+    printf("\nPreparing %'ld values ....\n", n);
+    for (int i = 0; i < n; ++i) {
+        if (G1.F.isZero(affineBases[i].x)) {
+            printf("ERROR on %d\n",i );
+            exit(EXIT_FAILURE);
+        }
+        G1.F.copy(values[i], affineBases[i].x);
+        G1.F.copy(elements[i].value, affineBases[i].x);
+    }
+    G1.F.batchInverse(results, values, n);
+    printf("\nStarting %'ld batchInverse (loops:%d block:%d) I ....\n", n, loops, loopSize);
+    start = clock();
+    for (int loop = 0; loop < loops; ++loop) {
+        G1.F.batchInverse(results + loop * loopSize, values + loop * loopSize, loopSize);
+    }
+    end = clock();
+    printf("Seconds used on %'ld batchInverse I: %.2lf\n", n, ((double) (end - start)) / CLOCKS_PER_SEC);
+
+    // G1.F.batchInverse_3(results2, sizeof(results2[0]), values, sizeof(values[0]), k);
+    G1.F.batchInverse_3(&elements[0].result, sizeof(elements[0]), &elements[0].value, sizeof(elements[0]), n);
+    printf("\nStarting %'ld batchInverse II ....\n", n);
+    start = clock();
+    for (int loop = 0; loop < loops; ++loop) {
+        // G1.F.batchInverse_3(&elements[loopSize * loop].result, 0 /*, sizeof(elements[0])*/, &elements[loopSize * loop].value, 0 /*sizeof(elements[0])*/, loopSize);
+        G1.F.batchInverse_3(&elements[0].result, 0 /*, sizeof(elements[0])*/, &elements[0].value, 0 /*sizeof(elements[0])*/, loopSize);
+    }
+    end = clock();
+    printf("Seconds used on %'ld batchInverse II: %.2lf\n", n, ((double) (end - start)) / CLOCKS_PER_SEC);
+    int cntOk = 0;
+    int cntFail = 0;
+    for (int i = 0; i < n; ++i) {
+//        printf("#V %s\n#1 %s\n#2 %s\n", G1.F.toString(values[i]).c_str(), G1.F.toString(results[i]).c_str(), G1.F.toString(results2[i]).c_str());
+        if (!G1.F.eq(results[i], elements[i].result)) {
+            ++cntFail;
+        }
+        else {
+            ++cntOk;
+        }
+    }
+    printf("%d differents values of %d\n", cntFail, cntOk);
+}
+
 void CurveAdds::calculateMultiSums ( void )
 {
     clock_t start, end;
@@ -338,11 +462,50 @@ void CurveAdds::calculateMultiSums ( void )
         exit(EXIT_FAILURE);
     }
     printf("\nStarting %'ld multi sums ....\n", n);
+    #ifdef FFIASM_FR_COUNTERS
+    F1Element k;
+    RawFq::Stats stats = G1.F.stats;
+    #endif
     start = clock();
     G1.multiAdd(multiSums, affineBases, affineBases + n, n);
     end = clock();
+    #ifdef FFIASM_FR_COUNTERS
+    RawFq::Stats stats2 = G1.F.stats;
+    printf("cntAdd:%'ld\n",  stats2.cntAdd-stats.cntAdd);
+    printf("cntSub:%'ld\n",  stats2.cntSub-stats.cntSub);
+    printf("cntMMul:%'ld\n", stats2.cntMMul-stats.cntMMul);
+    printf("cntSquare:%'ld\n", stats2.cntSquare-stats.cntSquare);
+    printf("cntMul1:%'ld\n", stats2.cntMul1-stats.cntMul1);
+    #endif
     multiSumsSeconds += ((double) (end - start)) / CLOCKS_PER_SEC;
     printf("Seconds used on %'ld multi sums: %.2lf\n", n, multiSumsSeconds);
+}
+
+void CurveAdds::calculateParallelMultiSums ( void )
+{
+    clock_t start, end;
+    int64_t startUs, endUs;
+
+
+    freeMultiSums();
+    multiSums = new G1PointAffine[n];
+    if (!multiSums) {
+        printf("ERROR allocating memory for %'ld G1PointAffine\n", n);
+        exit(EXIT_FAILURE);
+    }
+    printf("\nStarting %'ld multi sums ....\n", n);
+    #ifdef FFIASM_FR_COUNTERS
+    printf("\x1b[31mWARNING active FFIASM_FR_COUNTERS !!!\x1b[0m\n");
+    #endif
+    #ifdef COUNT_OPS
+    printf("\x1b[31mWARNING active COUNT_OPS !!!\x1b[0m\n");
+    #endif
+    start = clock();
+    startUs = getRealTimeClockUs();
+    G1.multiAdd(multiSums, affineBases, affineBases + n, n);
+    end = clock();
+    endUs = getRealTimeClockUs();
+    printf("Seconds used on %'ld multi sums [real:%.4lf cpu:%.4lf]\n", n, ((double) (endUs - startUs)) / 1000000.0, ((double) (end - start)) / CLOCKS_PER_SEC);
 }
 
 void CurveAdds::calculateSums ( void )
@@ -357,14 +520,144 @@ void CurveAdds::calculateSums ( void )
     }
 
     printf("\nStarting %'ld sums ....\n", n);
+    #ifdef FFIASM_FR_COUNTERS
+    F1Element k;
+    RawFq::Stats stats = G1.F.stats;
+    #endif
+
+    auto startUs = getRealTimeClockUs();
     start = clock();
     for (int64_t i=0; i < n; ++i) {
-        globalIndex = i;
+        // globalIndex = i;
         G1.add(sums[i], affineBases[i], bases[n + i]);
     }
     end = clock();
+    auto endUs = getRealTimeClockUs();    
+    #ifdef FFIASM_FR_COUNTERS
+    RawFq::Stats stats2 = G1.F.stats;
+    printf("cntAdd:%'ld\n",  stats2.cntAdd-stats.cntAdd);
+    printf("cntSub:%'ld\n",  stats2.cntSub-stats.cntSub);
+    printf("cntMMul:%'ld\n", stats2.cntMMul-stats.cntMMul);
+    printf("cntSquare:%'ld\n", stats2.cntSquare-stats.cntSquare);
+    printf("cntMul1:%'ld\n", stats2.cntMul1-stats.cntMul1);
+    #endif
     sumsSeconds += ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("Seconds used on %'ld sums: %.2lf\n", n, sumsSeconds);
+    printf("Seconds used on %'ld sums: %.4lf (%.4lf)\n", n, sumsSeconds, (double)(endUs - startUs)/1000000.0);
+}
+
+inline int64_t CurveAdds::getRealTimeClockUs ( void )
+{
+    struct timespec tm;
+    clock_gettime(CLOCK_REALTIME, &tm);
+    return tm.tv_sec * 1000000 + tm.tv_nsec / 1000;
+}
+
+void CurveAdds::calculateBaseOperations ( void )
+{
+    clock_t start[6], end[6];
+
+    freeSums();
+    auto sums = new G1PointAffine[n];
+    if (!sums) {
+        printf("ERROR allocating memory for %'ld G1Point\n", n);
+        exit(EXIT_FAILURE);
+    }
+
+    #ifdef FFIASM_FR_COUNTERS
+    F1Element k;
+    RawFq::Stats stats = G1.F.stats;
+    #endif
+    #define R_IND (8192 + (i & 0x001))
+    #define R_OP1 (8192 + (i & 0x001))
+    #define R_OP2 (8912 + ((i+1) & 0x001))
+    #define PREFETCH_N 1
+    auto ndiv2 = n / 2;
+    for (int loop = 0; loop < 10; ++loop) {
+        for (int64_t i=0; i < ndiv2; ++i) {
+            __builtin_prefetch(affineBases + R_OP1 + PREFETCH_N, 0);
+            __builtin_prefetch(affineBases + R_OP2 + PREFETCH_N, 0);
+            __builtin_prefetch(sums + R_IND + PREFETCH_N, 1);            
+            G1.F.add(sums[R_IND].x, affineBases[R_OP1].x, affineBases[R_OP2].x);
+            G1.F.add(sums[R_IND].y, affineBases[R_OP1].y, affineBases[R_OP2].y);
+        }
+        int timerIndex = 0;
+        printf("\nStarting %'ld sums ....\n", n);
+        start[timerIndex] = clock();
+        for (int64_t i=0; i < ndiv2; ++i) {
+            __builtin_prefetch(affineBases + R_OP1 + PREFETCH_N, 0);
+            __builtin_prefetch(affineBases + R_OP2 + PREFETCH_N, 0);
+            __builtin_prefetch(sums + R_IND + PREFETCH_N, 1);            
+            G1.F.add(sums[R_IND].x, affineBases[R_OP1].x, affineBases[R_OP2].x);
+            G1.F.add(sums[R_IND].y, affineBases[R_OP1].y, affineBases[R_OP2].y);
+        }
+        end[timerIndex++] = clock();
+        printf("\nStarting %'ld sub ....\n", n);
+        start[timerIndex] = clock();
+        for (int64_t i=0; i < ndiv2; ++i) {
+            __builtin_prefetch(affineBases + R_OP1 + PREFETCH_N, 0);
+            __builtin_prefetch(affineBases + R_OP2 + PREFETCH_N, 0);
+            __builtin_prefetch(sums + R_IND + PREFETCH_N, 1);            
+            G1.F.sub(sums[R_IND].x, affineBases[R_OP1].x, affineBases[R_OP2].x);
+            G1.F.sub(sums[R_IND].y, affineBases[R_OP1].y, affineBases[R_OP2].y);
+        }
+        end[timerIndex++] = clock();
+        printf("\nStarting %'ld mul ....\n", n);
+        start[timerIndex] = clock();
+        for (int64_t i=0; i < ndiv2; ++i) {
+            __builtin_prefetch(affineBases + R_OP1 + PREFETCH_N, 0);
+            __builtin_prefetch(affineBases + R_OP2 + PREFETCH_N, 0);
+            __builtin_prefetch(sums + R_IND + PREFETCH_N, 1);            
+            G1.F.mul(sums[R_IND].x, affineBases[R_OP1].x, affineBases[R_OP2].x);
+            G1.F.mul(sums[R_IND].y, affineBases[R_OP1].y, affineBases[R_OP2].y);
+        }
+        end[timerIndex++] = clock();
+        printf("\nStarting %'ld squares ....\n", n);
+        start[timerIndex] = clock();
+        for (int64_t i=0; i < ndiv2; ++i) {
+            __builtin_prefetch(affineBases + R_OP1 + PREFETCH_N, 0);
+            __builtin_prefetch(affineBases + R_OP2 + PREFETCH_N, 0);
+            __builtin_prefetch(sums + R_IND + PREFETCH_N, 1);            
+            G1.F.square(sums[R_IND].x, affineBases[R_OP1].x);
+            G1.F.square(sums[R_IND].y, affineBases[R_OP1].y);
+        }
+        end[timerIndex++] = clock();
+        printf("\nStarting %'ld inv ....\n", n);
+        start[timerIndex] = clock();
+        for (int64_t i=0; i < ndiv2; ++i) {
+            __builtin_prefetch(affineBases + R_OP1 + PREFETCH_N, 0);
+            __builtin_prefetch(affineBases + R_OP2 + PREFETCH_N, 0);
+            __builtin_prefetch(sums + R_IND + PREFETCH_N, 1);            
+            G1.F.inv(sums[R_IND].x, affineBases[R_OP1].x);
+            G1.F.inv(sums[R_IND].y, affineBases[R_OP1].y);
+        }
+        end[timerIndex++] = clock();
+        printf("\nStarting %'ld moves ....\n", n);
+        start[timerIndex] = clock();
+        for (int64_t i=0; i < ndiv2; ++i) {
+            __builtin_prefetch(affineBases + R_OP1 + PREFETCH_N, 0);
+            __builtin_prefetch(affineBases + R_OP2 + PREFETCH_N, 0);
+            __builtin_prefetch(sums + R_IND + PREFETCH_N, 1);            
+            sums[R_IND].y = affineBases[R_OP1].x;
+            sums[R_IND].x = affineBases[R_OP2].x;
+            sums[R_IND].x = affineBases[R_OP1].y;
+            sums[R_IND].y = affineBases[R_OP2].y;
+        }
+        end[timerIndex++] = clock();
+        #ifdef FFIASM_FR_COUNTERS
+        RawFq::Stats stats2 = G1.F.stats;
+        printf("cntAdd:%'ld\n",  stats2.cntAdd-stats.cntAdd);
+        printf("cntSub:%'ld\n",  stats2.cntSub-stats.cntSub);
+        printf("cntMMul:%'ld\n", stats2.cntMMul-stats.cntMMul);
+        printf("cntSquare:%'ld\n", stats2.cntSquare-stats.cntSquare);
+        printf("cntMul1:%'ld\n", stats2.cntMul1-stats.cntMul1);
+        #endif
+        printf("Seconds used on %'ld x add: %.4lf\n", n, ((double) (end[0] - start[0])) / CLOCKS_PER_SEC);
+        printf("Seconds used on %'ld x sub: %.4lf\n", n, ((double) (end[1] - start[1])) / CLOCKS_PER_SEC);
+        printf("Seconds used on %'ld x mmul: %.4lf\n", n, ((double) (end[2] - start[2])) / CLOCKS_PER_SEC);
+        printf("Seconds used on %'ld x square: %.4lf\n", n, ((double) (end[3] - start[3])) / CLOCKS_PER_SEC);
+        printf("Seconds used on %'ld x inv: %.4lf\n", n, ((double) (end[4] - start[4])) / CLOCKS_PER_SEC);
+        printf("Seconds used on %'ld x move: %.4lf\n", n, ((double) (end[5] - start[5])) / CLOCKS_PER_SEC);
+    }
 }
 
 void CurveAdds::verifySums ( void )
@@ -395,6 +688,15 @@ void CurveAdds::run( int argc, char **argv )
         }
         if (flgMultiSums) {
             calculateMultiSums();
+        }
+        if (flgParallelMultiSums) {
+            calculateParallelMultiSums();
+        }
+        if (flgBases) {
+            calculateBaseOperations();
+        }
+        if (flgInverses) {
+            calculateInverses();
         }
     }
 

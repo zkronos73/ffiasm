@@ -114,16 +114,30 @@ public:
 
     void inline copy(Element &r, const Element &a) { <%=name%>_rawCopy(r.v, a.v); };
     void inline swap(Element &a, Element &b) { <%=name%>_rawSwap(a.v, b.v); };
-    void inline add(Element &r, const Element &a, const Element &b) { <%=name%>_rawAdd(r.v, a.v, b.v); };
-    void inline sub(Element &r, const Element &a, const Element &b) { <%=name%>_rawSub(r.v, a.v, b.v); };
-    void inline mul(Element &r, const Element &a, const Element &b) { <%=name%>_rawMMul(r.v, a.v, b.v); };
 
-    Element inline add(const Element &a, const Element &b) { Element r; <%=name%>_rawAdd(r.v, a.v, b.v); return r;};
-    Element inline sub(const Element &a, const Element &b) { Element r; <%=name%>_rawSub(r.v, a.v, b.v); return r;};
-    Element inline mul(const Element &a, const Element &b) { Element r; <%=name%>_rawMMul(r.v, a.v, b.v); return r;};
+    #ifdef FFIASM_<%=name.toUpperCase()%>_COUNTERS
+    #define ICNT_<%=name.toUpperCase()%>(X) ++stats.X;
+    typedef struct {
+        uint64_t cntAdd;
+        uint64_t cntSub;
+        uint64_t cntMMul;
+        uint64_t cntSquare;
+        uint64_t cntMul1;
+    } Stats;
+    Stats stats;
+    #else
+    #define ICNT_<%=name.toUpperCase()%>(X)
+    #endif
+    void inline add(Element &r, const Element &a, const Element &b) { ICNT_<%=name.toUpperCase()%>(cntAdd); <%=name%>_rawAdd(r.v, a.v, b.v); };
+    void inline sub(Element &r, const Element &a, const Element &b) { ICNT_<%=name.toUpperCase()%>(cntSub); <%=name%>_rawSub(r.v, a.v, b.v); };
+    void inline mul(Element &r, const Element &a, const Element &b) { ICNT_<%=name.toUpperCase()%>(cntMMul); <%=name%>_rawMMul(r.v, a.v, b.v); };
+
+    Element inline add(const Element &a, const Element &b) { ICNT_<%=name.toUpperCase()%>(cntAdd); Element r; <%=name%>_rawAdd(r.v, a.v, b.v); return r;};
+    Element inline sub(const Element &a, const Element &b) { ICNT_<%=name.toUpperCase()%>(cntSub); Element r; <%=name%>_rawSub(r.v, a.v, b.v); return r;};
+    Element inline mul(const Element &a, const Element &b) { ICNT_<%=name.toUpperCase()%>(cntMMul); Element r; <%=name%>_rawMMul(r.v, a.v, b.v); return r;};
 
     Element inline neg(const Element &a) { Element r; <%=name%>_rawNeg(r.v, a.v); return r; };
-    Element inline square(const Element &a) { Element r; <%=name%>_rawMSquare(r.v, a.v); return r; };
+    Element inline square(const Element &a) { ICNT_<%=name.toUpperCase()%>(cntSquare); Element r; <%=name%>_rawMSquare(r.v, a.v); return r; };
 
     Element inline add(int a, const Element &b) { return add(set(a), b);};
     Element inline sub(int a, const Element &b) { return sub(set(a), b);};
@@ -133,12 +147,14 @@ public:
     Element inline sub(const Element &a, int b) { return sub(a, set(b));};
     Element inline mul(const Element &a, int b) { return mul(a, set(b));};
     
-    void inline mul1(Element &r, const Element &a, uint64_t b) { <%=name%>_rawMMul1(r.v, a.v, b); };
+    void inline mul1(Element &r, const Element &a, uint64_t b) { ICNT_<%=name.toUpperCase()%>(cntMul1); <%=name%>_rawMMul1(r.v, a.v, b); };
     void inline neg(Element &r, const Element &a) { <%=name%>_rawNeg(r.v, a.v); };
-    void inline square(Element &r, const Element &a) { <%=name%>_rawMSquare(r.v, a.v); };
+    void inline square(Element &r, const Element &a) { ICNT_<%=name.toUpperCase()%>(cntSquare);<%=name%>_rawMSquare(r.v, a.v); };
     void inv(Element &r, const Element &a);
     void div(Element &r, const Element &a, const Element &b);
     void exp(Element &r, const Element &base, uint8_t* scalar, unsigned int scalarSize);
+    void batchInverse_2 (Element *r, const Element *a, int count );
+    void batchInverse_3 (Element *r, int sizeR, const Element *a, int sizeA, int count );
     void batchInverse (Element *r, Element *a, int64_t count );
     void batchInverse (Element *r, const Element *a, Element *invs, Element *prods, int64_t count );
     void batchInverse (BatchInverseData *data, int64_t count );
