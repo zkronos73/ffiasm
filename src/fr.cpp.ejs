@@ -425,10 +425,9 @@ void Raw<%=name%>::batchInverse_2 (Element *r, const Element *a, int count )
 {
     if (!count) return;
     if (r == a) {
-
-        Element _a[count];
-        memcpy(_a, a, sizeof(Element) * count);
-        batchInverse(r, a, count);
+        Element *_r = (Element *)malloc(sizeof(Element) * count);
+        batchInverse_2(_r, a, count);
+        free(_r);
         return;
     }
     Element *pR = r;
